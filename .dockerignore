@@ -1,0 +1,21 @@
+.git
+node_modules
+.venv
+__pycache__
+*.log
+# Large assets and caches
+models
+model
+datasets
+data
+.cache
+wandb
+**/*.gguf
+**/*.safetensors
+**/*.pt
+**/*.bin
+**/*.ckpt
+**/*.onnx
+**/*.tar.gz
+**/*.zip
+**/*.mp4

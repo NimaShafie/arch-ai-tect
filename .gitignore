@@ -1,0 +1,90 @@
+# --- Secrets / env files (ignore everywhere) ---
+# Dot-prefixed .env files
+.env
+.env.*
+**/.env
+**/.env.*
+
+# Files that end with .env (e.g., dev.env, staging.env)
+*.env
+**/*.env
+
+# Common variants
+.envrc
+
+# Keep templates in Git
+!.env.example
+!**/.env.example
+!*.env.example
+!**/*.env.example
+!.env.sample
+!**/.env.sample
+!*.env.sample
+!**/*.env.sample
+
+# Node/Next.js
+node_modules/
+.next/
+dist/
+out/
+.env
+.env.*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-store/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.envrc
+
+# Docker & local volumes
+docker-data/
+**/volumes/
+*.tar
+*.img
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Build artifacts / coverage
+build/
+coverage/
+*.log
+
+# Misc
+*.zip
+*.bak
+*.swp
+# --- AI models / datasets (never commit) ---
+models/
+model/
+checkpoints/
+datasets/
+data/
+.cache/
+wandb/
+logs/
+**/*.gguf
+**/*.safetensors
+**/*.pt
+**/*.bin
+**/*.ckpt
+**/*.onnx
+**/*.tar.gz
+**/*.zip
+**/*.mp4
+**/*.parquet
+**/*.feather
+
+# Ollama (in case someone used a bind mount)
+.ollama/
+**/.ollama/
+
+# Hugging Face caches
+~/.cache/huggingface/
+**/huggingface/
