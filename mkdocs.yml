@@ -1,5 +1,44 @@
 site_name: Architecture Workbench
+site_url: https://docs.shafie.org
+
 theme:
   name: material
+  features:
+    - navigation.instant
+    - navigation.top
+    - content.code.copy
+    - content.tabs.link
+
 nav:
   - Home: index.md
+  - Services: services.md
+  - Diagrams:
+      - Readme: diagrams/README.md
+      - Booking Flow: diagrams/booking-sequence.md
+      - Deployment: diagrams/deployment.md
+
+markdown_extensions:
+  - admonition
+  - def_list
+  - footnotes
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight
+  - pymdownx.tabbed
+  - attr_list
+  - tables
+
+plugins:
+  - search
+  - macros
+  - kroki:
+      server_url: "https://kroki.shafie.org"   # <- correct key
+      # http_method: "POST"                   # enable if you have very large diagrams
+
+extra:
+  endpoints:
+    openwebui: https://ai.shafie.org/
+    kroki: https://kroki.shafie.org/
+    plantuml: https://uml.shafie.org/

@@ -6,15 +6,41 @@ services:
     ports: ["${OLLAMA_PORT:-11434}:11434"]
     volumes:
       - ollama_models:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+      - OLLAMA_NUM_THREADS=8       # = VM vCPU count you set
+      - OLLAMA_NUM_PARALLEL=1      # one prompt at a time = lower latency
+      - OLLAMA_FLASH_ATTENTION=false
     healthcheck:
       test: ["CMD", "ollama", "list"]
       interval: 10s
       timeout: 5s
-      retries: 60
+      retries: 30
       start_period: 120s
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
+    networks: [proxy]
+
+  # One-shot init job to manage models in the shared volume
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: ollama-init
+    depends_on:
+      ollama:
+        condition: service_started
+    volumes:
+      - ollama_models:/root/.ollama
+    entrypoint: ["/bin/sh","-lc"]
+    command: |
+      set -e
+      echo "Pulling qwen2.5:3b..."
+      ollama pull qwen2.5:3b || true
+      echo "Removing qwen3:8b (if present)..."
+      ollama rm qwen3:8b || true
+      echo "Model setup complete."
+    restart: "no"
+    networks: [proxy]
 
   openwebui:
     image: ghcr.io/open-webui/open-webui:main
@@ -23,48 +49,64 @@ services:
     depends_on:
       ollama:
         condition: service_started
+      ollama-init:
+        condition: service_completed_successfully
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
-      - WEBUI_NAME=${WEBUI_NAME:-Architecture Workbench}
-    ports: ["${OPENWEBUI_PORT:-3000}:8080"]
+      - WEBUI_NAME=ArchAiTect Workbench (Open WebUI)
+      - ENABLE_MULTI_USER=true
+      - DEFAULT_MODELS=qwen2.5:3b
+      - OLLAMA_KEEP_ALIVE=1h
+      - ENABLE_REGISTRATION=False
+      - ALLOWED_EMAIL_DOMAINS=csun.edu,my.csun.edu,gmail.com
+      - ALLOW_EMAIL_LIST=nimzshafie@gmail.com
+      - WEBUI_AUTH_TRUSTED_EMAIL_HEADER=CF-Access-Authenticated-User-Email
+    ports: ["${OPENWEBUI_PORT:-3001}:8080"]
     volumes:
       - openwebui_data:/app/backend/data
+      - openwebui_cache:/root/.cache
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8080/ || exit 1"]
-      interval: 10s
-      timeout: 3s
-      retries: 10
-      start_period: 15s
-    logging:
-      driver: json-file
-      options: { max-size: "10m", max-file: "3" }
-
-  # MkDocs dev server (compose file lives in ./compose, so mount ../)
-  docs:
-    image: squidfunk/mkdocs-material:latest
-    container_name: docs
-    restart: unless-stopped
-    working_dir: /work
-    command: serve -a 0.0.0.0:8080   # ENTRYPOINT is "mkdocs"
-    volumes:
-      - ../:/work:ro                 # mount the repo root correctly
-    healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080', timeout=2)\""]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/api/config >/dev/null 2>&1 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 15s
+      start_period: 20s
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
+    networks: [proxy]
+
+  docs:
+    build: ./docs
+    image: local/mkdocs-material-with-plugins:latest
+    container_name: docs
+    restart: unless-stopped
+    working_dir: /work
+    command: serve -a 0.0.0.0:8080
+    environment:
+      - XDG_CACHE_HOME=/var/mkdocs/cache
+    volumes:
+      - ../:/work:ro
+      - docs_site:/var/mkdocs/site
+      - docs_cache:/var/mkdocs/cache
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080 >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks: [proxy]
 
   kroki:
-    image: yuzutech/kroki
+    image: yuzutech/kroki:latest
     container_name: kroki
     restart: unless-stopped
     ports: ["${KROKI_PORT:-8000}:8000"]
+    environment:
+      - KROKI_MAX_URI_LENGTH=16384
+      - KROKI_MAX_CONTENT_LENGTH=1048576
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8000/ || exit 1"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -72,6 +114,7 @@ services:
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
+    networks: [proxy]
 
   plantuml:
     image: plantuml/plantuml-server:jetty
@@ -87,6 +130,7 @@ services:
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
+    networks: [proxy]
 
   cloudflared:
     image: cloudflare/cloudflared:latest
@@ -97,8 +141,12 @@ services:
       - TUNNEL_TOKEN=${CF_TUNNEL_TOKEN}
     depends_on:
       docs:
-        condition: service_started
+        condition: service_healthy
       openwebui:
+        condition: service_healthy
+      kroki:
+        condition: service_started
+      plantuml:
         condition: service_started
     profiles: ["tunnel"]
     healthcheck:
@@ -110,7 +158,15 @@ services:
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
+    networks: [proxy]
 
 volumes:
   ollama_models: {}
   openwebui_data: {}
+  openwebui_cache: {}
+  docs_site: {}
+  docs_cache: {}
+
+networks:
+  proxy:
+    external: true
