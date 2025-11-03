@@ -1,0 +1,52 @@
+name: New Architecture Intake (ArchAiTect)
+description: Provide the minimum info to generate a package
+title: "[ARCH] <Title here>"
+labels: ["architecture", "intake"]
+body:
+  - type: input
+    id: title
+    attributes: { label: Title, placeholder: "Authorization Architecture" }
+    validations: { required: true }
+  - type: input
+    id: owner
+    attributes: { label: Owner, placeholder: "Platform Team" }
+    validations: { required: true }
+  - type: textarea
+    id: summary
+    attributes: { label: Summary, placeholder: "What problem are we solving?" }
+    validations: { required: true }
+  - type: textarea
+    id: goals
+    attributes: { label: Goals (bullets), placeholder: "- Goal 1\n- Goal 2" }
+    validations: { required: true }
+  - type: textarea
+    id: scopein
+    attributes: { label: In Scope (bullets), placeholder: "- Item A\n- Item B" }
+  - type: textarea
+    id: scopeout
+    attributes: { label: Out of Scope (bullets), placeholder: "- Item X\n- Item Y" }
+  - type: textarea
+    id: actors
+    attributes: { label: Actors/Systems, placeholder: "- End User\n- Admin\n- IdP\n- Downstream API" }
+  - type: textarea
+    id: flows
+    attributes: { label: Key Flows (sequence names), placeholder: "- Login\n- Access Decision" }
+  - type: textarea
+    id: constraints
+    attributes: { label: Constraints, placeholder: "- PCI\n- PII in region\n- <50ms P99" }
+  - type: textarea
+    id: nfrs
+    attributes: { label: NFRs, placeholder: "- 99.9% avail\n- 1k rps" }
+  - type: textarea
+    id: interfaces
+    attributes: { label: Interfaces/APIs, placeholder: "- REST /authz\n- Kafka topic xyz" }
+  - type: input
+    id: tech
+    attributes: { label: Tech Preferences, placeholder: "OIDC, OPA, AWS RDS, ..." }
+  - type: input
+    id: envs
+    attributes: { label: Environments, placeholder: "dev,test,stage,prod" }
+  - type: input
+    id: packageid
+    attributes: { label: Package ID (optional), placeholder: "authorization-architecture" }
+    validations: { required: false }

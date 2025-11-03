@@ -1,0 +1,9 @@
+sequenceDiagram
+  autonumber
+  participant U as User
+  participant API as API
+  participant IDP as IdP
+  U->>API: Start login
+  API->>IDP: OIDC redirect
+  IDP-->>API: ID token
+  API-->>U: Session established

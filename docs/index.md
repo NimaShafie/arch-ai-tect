@@ -35,6 +35,10 @@ Use these prompts and tools to generate C4 (Structurizr), Deployment/Sequence (P
 
 ---
 
+See the [Catalog](catalog.md) for all architecture packages.
+
+---
+
 ## Next steps (roadmap)
 
 - [ ] Stand up **Kroki** behind your proxy (e.g., `https://kroki.shafie.org/`)

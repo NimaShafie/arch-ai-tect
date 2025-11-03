@@ -1,0 +1,31 @@
+title: "Authorization Architecture"
+owner: "Platform Team"
+package_id: "authorization-architecture"
+
+summary: "Centralized, policy-driven authorization for internal services and external clients."
+goals:
+  - "Externalize authorization decisions from services"
+  - "Support ABAC/RBAC via policy"
+  - "Provide consistent auditing"
+scope:
+  in:  ["decision API (PDP)", "policy store", "SDK/sidecar (PEP)"]
+  out: ["identity proofing", "payment authorization"]
+actors:
+  - name: "End User"
+  - name: "Service A"
+  - name: "IdP"
+  - name: "Policy Admin"
+key_flows:
+  - name: "Login"
+  - name: "Access Decision"
+constraints:
+  - "PII stays in region"
+  - "P99 decision latency < 50ms"
+nfrs:
+  - "99.9% availability"
+  - "auditable decisions"
+interfaces:
+  - name: "POST /v1/decision"
+    protocol: "HTTP/JSON"
+tech_prefs: ["OIDC", "OPA/Rego"]
+environments: ["dev", "stage", "prod"]

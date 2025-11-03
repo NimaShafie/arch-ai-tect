@@ -1,4 +1,4 @@
-site_name: Architecture Workbench
+site_name: ArchAiTect Workbench
 site_url: https://docs.shafie.org
 
 theme:
@@ -12,6 +12,7 @@ theme:
 nav:
   - Home: index.md
   - Services: services.md
+  - Catalog: catalog.md
   - Diagrams:
       - Readme: diagrams/README.md
       - Booking Flow: diagrams/booking-sequence.md

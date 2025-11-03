@@ -1,0 +1,10 @@
+@startuml
+title {{TITLE}} — Sequence: Login
+actor User as U
+participant "API" as API
+participant "IdP" as IDP
+U -> API : Start login
+API -> IDP : OIDC redirect
+IDP --> API : ID token
+API --> U : Session established
+@enduml

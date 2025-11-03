@@ -1,0 +1,14 @@
+@startuml
+' Logical diagram (UML Component)
+@startuml
+title {{TITLE}} — Logical Components
+
+component "API Gateway" as APIG
+component "Service" as SVC
+component "Policy Engine" as POL
+database "DB" as DB
+
+APIG --> SVC : REST
+SVC --> POL : evaluate()
+SVC --> DB : read/write
+@enduml

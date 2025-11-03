@@ -1,0 +1,19 @@
+{
+  "tasks": [
+    {
+      "summary": "Draft spec for {{TITLE}}",
+      "description": "Write scope, NFRs, assumptions in spec.md for {{TITLE}}.",
+      "status": "Todo"
+    },
+    {
+      "summary": "Produce C4 + Mermaid diagrams",
+      "description": "Complete .puml + .mmd under diagrams/; ensure SVGs render in CI.",
+      "status": "Todo"
+    },
+    {
+      "summary": "Publish docs",
+      "description": "Docs should include spec, diagrams, reference architecture, and implementation guide.",
+      "status": "Todo"
+    }
+  ]
+}

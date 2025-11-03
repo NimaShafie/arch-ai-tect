@@ -1,0 +1,24 @@
+{
+  "projectKey": "ARCH",
+  "epic": {
+    "summary": "{{TITLE}}",
+    "description": "Architecture package for {{TITLE}} (Package ID: {{PACKAGE_ID}})."
+  },
+  "stories": [
+    {
+      "summary": "Draft spec for {{TITLE}}",
+      "description": "Complete spec.md with scope, NFRs, assumptions.",
+      "acceptanceCriteria": ["Spec reviewed and approved by stakeholders"]
+    },
+    {
+      "summary": "Produce C4 + Mermaid diagrams for {{TITLE}}",
+      "description": "Complete .puml and .mmd files; CI renders SVGs.",
+      "acceptanceCriteria": ["All diagrams render without errors"]
+    },
+    {
+      "summary": "Publish docs for {{TITLE}}",
+      "description": "MkDocs shows spec, diagrams, reference arch, and implementation guide.",
+      "acceptanceCriteria": ["Docs published and linked from Jira/Notion"]
+    }
+  ]
+}

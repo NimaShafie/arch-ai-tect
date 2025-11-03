@@ -1,0 +1,17 @@
+name: New Architecture Package
+description: Scaffold a new architecture package
+title: "[ARCH] <Title here>"
+labels: ["architecture"]
+body:
+  - type: input
+    id: title
+    attributes:
+      label: Title
+      placeholder: "Payments Architecture"
+    validations: { required: true }
+  - type: input
+    id: slug
+    attributes:
+      label: Slug
+      placeholder: "payments"
+    validations: { required: true }

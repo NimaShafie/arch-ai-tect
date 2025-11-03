@@ -1,0 +1,15 @@
+@startuml
+' C4 Context
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+LAYOUT_WITH_LEGEND()
+
+title {{TITLE}} — Context
+
+Person(user, "User")
+System_Boundary(sys, "{{TITLE}}") {
+  System(core, "{{TITLE}} Core Service", "High-level responsibility")
+}
+Rel(user, core, "Uses")
+
+SHOW_LEGEND()
+@enduml

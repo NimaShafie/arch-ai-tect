@@ -1,0 +1,37 @@
+title: "{{TITLE}}"
+owner: "{{OWNER}}"
+package_id: "{{PACKAGE_ID}}"
+
+summary: "TBD: one to three sentences"
+
+goals:
+  - "TBD"
+scope:
+  in:
+    - "TBD"
+  out:
+    - "TBD"
+
+actors:
+  - name: "User"
+  - name: "Admin"
+  - name: "IdP"
+  - name: "Downstream API"
+
+key_flows:
+  - name: "Login"
+  - name: "Access Decision"
+
+constraints:
+  - "TBD"
+nfrs:
+  - "TBD"
+
+interfaces:
+  - name: "Auth API"
+    protocol: "HTTP/JSON"
+    path: "/authz"
+tech_prefs:
+  - "TBD"
+
+environments: ["dev", "test", "stage", "prod"]
