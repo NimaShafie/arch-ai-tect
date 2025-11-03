@@ -69,8 +69,8 @@ services:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/api/config >/dev/null 2>&1 || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 10
-      start_period: 20s
+      retries: 20
+      start_period: 60s
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
@@ -132,6 +132,21 @@ services:
       options: { max-size: "10m", max-file: "3" }
     networks: [proxy]
 
+  webhook:
+    image: node:20-alpine
+    container_name: webhook
+    working_dir: /opt/auto-deploy
+    volumes:
+      - /opt/auto-deploy:/opt/auto-deploy:ro
+    command: ["node", "webhook.js"]
+    environment:
+      - PORT=9000
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET}
+    depends_on:
+      cloudflared:
+        condition: service_started
+    # no "ports:" section — not exposed on the host
+
   cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: cloudflared
@@ -141,9 +156,9 @@ services:
       - TUNNEL_TOKEN=${CF_TUNNEL_TOKEN}
     depends_on:
       docs:
-        condition: service_healthy
+        condition: service_started
       openwebui:
-        condition: service_healthy
+        condition: service_started
       kroki:
         condition: service_started
       plantuml:
@@ -155,9 +170,6 @@ services:
       timeout: 5s
       retries: 20
       start_period: 10s
-    logging:
-      driver: json-file
-      options: { max-size: "10m", max-file: "3" }
     networks: [proxy]
 
 volumes:

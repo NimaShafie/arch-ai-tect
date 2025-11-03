@@ -1,0 +1,19 @@
+tunnel: ece96b09-4653-4e03-8a6b-decbbc2f1b14
+credentials-file: /etc/cloudflared/credentials.json
+
+ingress:
+  - hostname: ai.shafie.org
+    path: /webhook
+    service: http://webhook:9000
+
+  - hostname: ai.shafie.org
+    service: http://openwebui:8080
+
+  - hostname: docs.shafie.org
+    service: http://docs:8080
+  - hostname: uml.shafie.org
+    service: http://plantuml:8080
+  - hostname: kroki.shafie.org
+    service: http://kroki:8000
+
+  - service: http_status:404
