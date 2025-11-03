@@ -88,3 +88,4 @@ logs/
 # Hugging Face caches
 ~/.cache/huggingface/
 **/huggingface/
+scripts/disney_ai_plus_deploy
