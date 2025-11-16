@@ -11,6 +11,7 @@ theme:
 
 nav:
   - Home: index.md
+  - Projects: projects/INDEX.md
   - Services: services.md
   - Catalog: catalog.md
   - Diagrams:

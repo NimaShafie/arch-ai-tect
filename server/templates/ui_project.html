@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h2>Project created ✅</h2>
+  <p>
+    <strong>{{ project.name }}</strong> (<span class="mono">{{ project.slug }}</span>) is ready.
+  </p>
+
+  <article>
+    <h3>Next steps</h3>
+    <ol>
+      <li>Fill the brief (high-level requirements)</li>
+      <li>Choose diagram types and dialects</li>
+      <li>Generate and refine</li>
+    </ol>
+  </article>
+
+  <div role="group">
+    <a role="button" href="{{ url_for('ui_home') }}">Create another</a>
+    <a role="button" class="secondary" href="{{ docs_base }}{{ docs_url }}" target="_blank" rel="noopener">Open in Docs</a>
+    <a role="button" class="secondary" href="/docs" target="_blank" rel="noopener">Open Swagger</a>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h2>{{ heading or "All set" }} 🎉</h2>
+  <p>{{ message }}</p>
+  {% if link_href %}
+    <p><a href="{{ link_href }}" target="_blank" rel="noopener">{{ link_text or "Open" }}</a></p>
+  {% endif %}
+  <a role="button" href="{{ url_for('ui_home') }}">Back to start</a>
+</div>
+{% endblock %}

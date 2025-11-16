@@ -52,15 +52,29 @@ services:
       ollama-init:
         condition: service_completed_successfully
     environment:
+      - WEBUI_AUTH=True
+      - WEBUI_URL=https://ai.shafie.org
       - OLLAMA_BASE_URL=http://ollama:11434
-      - WEBUI_NAME=ArchAiTect Workbench (Open WebUI)
       - ENABLE_MULTI_USER=true
       - DEFAULT_MODELS=qwen2.5:3b
       - OLLAMA_KEEP_ALIVE=1h
-      - ENABLE_REGISTRATION=False
-      - ALLOWED_EMAIL_DOMAINS=csun.edu,my.csun.edu,gmail.com
-      - ALLOW_EMAIL_LIST=nimzshafie@gmail.com
-      - WEBUI_AUTH_TRUSTED_EMAIL_HEADER=CF-Access-Authenticated-User-Email
+
+      # (optional, you can keep these; they don't block signup)
+      - WEBUI_AUTH_TRUSTED_NAME_HEADER=cf-access-authenticated-user-email
+      - WEBUI_AUTH_TRUSTED_EMAIL_HEADER=cf-access-authenticated-user-email
+
+      # temp
+      - DEFAULT_USER_ROLE=user
+
+      # real signup switches
+      - ENABLE_SIGNUP=False
+      # let you through while you register (optional, but helpful)
+      - ALLOW_EMAIL_LIST=nimzshafie@gmail.com,nima.shafie.374@my.csun.edu,nima.shafie@csun.edu
+      - ALLOWED_EMAIL_DOMAINS=my.csun.edu,csun.edu
+
+      # force env to be honored on this boot
+      - ENABLE_PERSISTENT_CONFIG=True
+
     ports: ["${OPENWEBUI_PORT:-3001}:8080"]
     volumes:
       - openwebui_data:/app/backend/data
@@ -145,7 +159,7 @@ services:
     depends_on:
       cloudflared:
         condition: service_started
-    # no "ports:" section — not exposed on the host
+    profiles: ["tunnel"]  
 
   cloudflared:
     image: cloudflare/cloudflared:latest
@@ -163,6 +177,8 @@ services:
         condition: service_started
       plantuml:
         condition: service_started
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     profiles: ["tunnel"]
     healthcheck:
       test: ["CMD-SHELL", "pgrep -x cloudflared >/dev/null || exit 1"]

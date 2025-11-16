@@ -1,0 +1,192 @@
+<!-- server/templates/base.html -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>{% block title %}ArchAiTect Workbench{% endblock %}</title>
+
+  <style>
+    :root{
+      /* Material-ish palette */
+      --md-primary:#4051b5;      /* Indigo 600 */
+      --md-primary-700:#3340a1;
+      --md-accent:#0288d1;       /* Light Blue 600 */
+      --md-bg:#f6f7fb;           /* page bg */
+      --md-surface:#ffffff;      /* cards/panels */
+      --md-on-surface:#2e3137;   /* text */
+      --md-muted:#6b7280;        /* labels, secondary */
+      --md-border:#e5e7eb;       /* subtle borders */
+      --md-code:#0e1117;         /* footer bg */
+      --ring:#b3c0ff;
+
+      /* Sizing (close to MkDocs Material, compact) */
+      --fs-base:15px;
+      --fs-small:13px;
+      --fs-h1:1.60rem;
+      --fs-h2:1.25rem;
+      --fs-h3:1.05rem;
+
+      --radius:12px;
+      --gap:18px;
+      --shadow:0 1px 2px rgba(0,0,0,.05), 0 8px 24px rgba(0,0,0,.06);
+      --shadow-soft:0 1px 2px rgba(0,0,0,.05), 0 4px 14px rgba(0,0,0,.05);
+
+      /* NEW: Padding system so text never hugs edges */
+      --pad-card:24px;
+      --pad-card-lg:28px;
+      --pad-field-y:12px;
+      --pad-field-x:14px;
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font:400 var(--fs-base)/1.55 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
+      color:var(--md-on-surface);
+      background:var(--md-bg);
+      text-rendering:optimizeLegibility;
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+    }
+
+    /* Top app bar */
+    .appbar{
+      position:sticky; top:0; z-index:10;
+      background:var(--md-primary);
+      color:#eef2ff;
+      box-shadow:var(--shadow);
+    }
+    .appbar__inner{
+      max-width:1200px;
+      margin:0 auto;
+      padding:10px 22px;
+      display:flex; align-items:center; gap:14px;
+    }
+    .brand{display:flex; align-items:center; gap:10px; font-weight:600; letter-spacing:.2px}
+    .brand__dot{width:8px;height:8px;border-radius:50%;background:#7dd3fc;box-shadow:0 0 0 3px rgba(125,211,252,.2)}
+    nav a{color:#e7eafe; text-decoration:none; font-size:var(--fs-small); padding:6px 10px; border-radius:6px}
+    nav a:hover{background:rgba(255,255,255,.1)}
+
+    /* Page container */
+    .page{
+      max-width:1200px;
+      margin:26px auto;
+      padding:0 22px 28px;
+    }
+
+    /* Cards / panels with real inner padding */
+    .card{
+      background:var(--md-surface);
+      border:1px solid var(--md-border);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow-soft);
+      padding:var(--pad-card);
+    }
+    /* Large card option (used for the main form) */
+    .card--lg{ padding:var(--pad-card-lg) }
+
+    /* Clear section headings with space from edges */
+    .section-title{
+      font-size:var(--fs-h1);
+      font-weight:700;
+      margin:0 0 14px 0;
+      color:#111827;
+    }
+    .section-subtitle{
+      font-size:var(--fs-small);
+      color:var(--md-muted);
+      margin:0 0 18px 0;
+    }
+
+    /* Field labels and inputs */
+    .field{ margin-top:16px }
+    .field:first-child{ margin-top:0 }
+    label{
+      display:block; font-size:var(--fs-small);
+      font-weight:600; color:var(--md-muted);
+      margin:0 0 6px 2px;     /* small inset so label never touches border */
+    }
+    input, textarea, select{
+      width:100%;
+      font:inherit;
+      color:#e5e7eb;
+      background:#0b1220;
+      border:1px solid #0b1220;
+      border-radius:10px;
+      padding:var(--pad-field-y) var(--pad-field-x);
+      outline:0;
+      transition:border-color .15s, box-shadow .15s, background .15s;
+    }
+    input::placeholder, textarea::placeholder{ color:#9aa3b2 }
+    input:focus, textarea:focus, select:focus{
+      border-color:var(--md-primary);
+      outline:2px solid var(--ring);
+      outline-offset:0;
+      background:#0b1220;
+    }
+
+    .actions{ margin-top:16px; display:flex; gap:12px; flex-wrap:wrap }
+
+    /* Buttons */
+    .btn{
+      display:inline-flex; align-items:center; justify-content:center;
+      gap:8px; font-weight:600; cursor:pointer; user-select:none;
+      border:1px solid transparent; border-radius:10px;
+      padding:11px 16px; font-size:var(--fs-base);
+      transition:transform .02s ease, box-shadow .15s ease, background .15s, border-color .15s;
+    }
+    .btn:active{ transform:translateY(1px) }
+    .btn--primary{ background:var(--md-accent); color:#fff; box-shadow:0 1px 0 rgba(0,0,0,.04), 0 6px 16px rgba(2,136,209,.25) }
+    .btn--primary:hover{ filter:brightness(0.96) }
+    .btn--ghost{ background:#f3f4f6; color:#111827; border-color:#e5e7eb }
+    .btn--ghost:hover{ background:#e9ebf0 }
+
+    /* Info panel */
+    .info{ background:#f9fafb; border:1px dashed var(--md-border); border-radius:var(--radius); color:#374151; padding:14px; font-size:var(--fs-small) }
+    .info__title{ font-weight:700; margin-bottom:8px; color:#111827 }
+
+    /* Utility layout */
+    .stack{ display:flex; flex-direction:column; gap:14px }
+    .grid{ display:grid; gap:var(--gap); grid-template-columns:1fr }
+    @media (min-width:1024px){ .grid--2{ grid-template-columns:1.1fr .9fr } }
+
+    /* Footer */
+    .footer{ background:var(--md-code); color:#cbd5e1; margin-top:40px; padding:18px 0 }
+    .footer__inner{ max-width:1200px; margin:0 auto; padding:0 22px; font-size:var(--fs-small); display:flex; align-items:center; justify-content:space-between; gap:12px }
+    .footer a{ color:#93c5fd; text-decoration:none }
+    .footer a:hover{ text-decoration:underline }
+  </style>
+
+  {% block head_extra %}{% endblock %}
+</head>
+<body>
+  <header class="appbar">
+    <div class="appbar__inner">
+      <div class="brand" style="margin-right:auto">
+        <span class="brand__dot"></span>
+        <span>ArchAiTect Workbench</span>
+      </div>
+      <nav>
+        <a href="https://docs.shafie.org" rel="noopener">Docs</a>
+        <a href="/docs">Swagger</a>
+        <a href="https://ai.shafie.org" rel="noopener">OpenWebUI</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="page">
+    {% block body %}
+      {% block content %}{% endblock %}
+    {% endblock %}
+  </main>
+
+  <footer class="footer">
+    <div class="footer__inner">
+      <div>© {{ now().year }} ArchAiTect — workbench.shafie.org</div>
+      <div><a href="https://docs.shafie.org">Documentation</a></div>
+    </div>
+  </footer>
+</body>
+</html>
