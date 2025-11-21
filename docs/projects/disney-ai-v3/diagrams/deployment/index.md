@@ -1,0 +1,21 @@
+# Disney+Ai+ V3 · Deployment
+
+> Source is embedded below and rendered via Kroki/PlantUML.
+
+```plantuml
+@startuml
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Deployment.puml
+LAYOUT_WITH_LEGEND()
+
+title {{TITLE}} — Deployment
+
+Deployment_Node(cloud, "Cloud", "Region") {
+  Deployment_Node(k8s, "Kubernetes", "Cluster") {
+    Container(k8s_svc, "Service", "Container", "v1")
+  }
+}
+Rel(cloud, k8s_svc, "Ingress/Traffic")
+
+SHOW_LEGEND()
+@enduml
+```

@@ -1,0 +1,39 @@
+{
+  "project_name": "Disney+Ai+ Test",
+  "domain": "media-streaming",
+  "stakeholders": [
+    "Product",
+    "Engineering",
+    "Security"
+  ],
+  "actors": [
+    "Visitor",
+    "Registered User",
+    "Admin"
+  ],
+  "core_capabilities": [
+    "Browse catalog",
+    "Playback",
+    "Subscriptions"
+  ],
+  "key_user_journeys": [
+    "Sign up",
+    "Login",
+    "Play a title"
+  ],
+  "constraints": [
+    "Multi-region",
+    "DRM",
+    "99.9% uptime"
+  ],
+  "non_functional_reqs": [
+    "Latency < 200ms",
+    "SLO 99.9%",
+    "Observability"
+  ],
+  "tech_preferences": [
+    "Cloud-native",
+    "Managed DB",
+    "CDN"
+  ]
+}

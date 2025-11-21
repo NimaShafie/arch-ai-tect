@@ -1,63 +1,45 @@
-{# server/templates/ui_home.html #}
 {% extends "base.html" %}
-{% block title %}New Architecture Project · ArchAiTect Workbench{% endblock %}
+{% block title %}New Project · ArchAiTect{% endblock %}
 
 {% block content %}
-<div class="grid">
-  <!-- Main form -->
-  <section class="card card--lg stack">
-    <h1 class="section-title">New Architecture Project</h1>
-    <p class="section-subtitle">
-      Create a project namespace; we’ll scaffold its docs and keep artifacts in sync.
-    </p>
+  <div class="grid">
+    <!-- New Project -->
+    <section class="card">
+      <div class="hd">New Architecture Project</div>
+      <div class="bd">
+        <p class="muted" style="margin-top:0">
+          Create a project namespace; we’ll scaffold its docs and keep artifacts in sync.
+        </p>
 
-    <form action="/ui/create" method="post" class="stack" novalidate>
-      <div class="field">
-        <label for="name">Project Name</label>
-        <input id="name" name="name" type="text"
-               placeholder="e.g., Disney+Ai+" required />
+        <form method="post" action="/ui/create" autocomplete="on">
+          <div class="field">
+            <label>Project Name</label>
+            <input class="json-textarea" style="min-height:unset;height:var(--btn-h);background:#fff;color:#0f172a;font:16px/1.3 system-ui" name="name" placeholder="e.g., Disney+Ai+" required />
+          </div>
+          <div class="field">
+            <label>Slug <span class="muted">(optional)</span></label>
+            <input class="json-textarea" style="min-height:unset;height:var(--btn-h);background:#fff;color:#0f172a;font:16px/1.3 system-ui" name="slug" placeholder="auto-from-name" />
+          </div>
+          <div class="field">
+            <label>Nav Title <span class="muted">(optional)</span></label>
+            <input class="json-textarea" style="min-height:unset;height:var(--btn-h);background:#fff;color:#0f172a;font:16px/1.3 system-ui" name="nav_title" placeholder="defaults to name" />
+          </div>
+          <button class="btn primary" type="submit">Create</button>
+        </form>
       </div>
+    </section>
 
-      <div class="field">
-        <label for="slug">Slug <span class="help">(optional)</span></label>
-        <input id="slug" name="slug" type="text"
-               placeholder="auto-from-name" />
+    <!-- Account + Info -->
+    <section class="card">
+      <div class="hd">What you get</div>
+      <div class="bd">
+        <ul style="margin-top:0">
+          <li>Project folder under <code>docs/projects/&lt;slug&gt;</code></li>
+          <li>Automatic sync into MkDocs navigation</li>
+          <li>Brief intake → diagram choices → generate diagrams</li>
+        </ul>
+        <p class="muted" style="margin-bottom:0">Need the API schema? <a href="/docs">Open Swagger</a>.</p>
       </div>
-
-      <div class="field">
-        <label for="nav_title">Nav Title <span class="help">(optional)</span></label>
-        <input id="nav_title" name="nav_title" type="text"
-               placeholder="defaults to name" />
-      </div>
-
-      <div class="actions">
-        <button class="btn btn--primary" type="submit">Create</button>
-        <a class="btn btn--ghost" href="/docs">Open Swagger</a>
-      </div>
-    </form>
-  </section>
-
-  <!-- Info panel -->
-  <aside class="card">
-    <h2 class="section-title" style="font-size: var(--fs-h2); margin-bottom:10px;">
-      What you get
-    </h2>
-
-    <ul style="margin:0; padding-left:20px;">
-      <li>Project folder under <code>docs/projects/&lt;slug&gt;</code></li>
-      <li>Sync into MkDocs navigation automatically</li>
-      <li>Later steps: brief intake → diagram types → generate diagrams</li>
-    </ul>
-
-    <details style="margin-top:14px;">
-      <summary style="cursor:pointer;">Where do outputs go?</summary>
-      <div class="info" style="margin-top:10px;">
-        <div class="info__title">Outputs</div>
-        Generated diagrams and pages are written inside
-        <code>docs/projects/&lt;slug&gt;/</code>. After generation, the Projects
-        nav in MkDocs is rebuilt so your new space appears immediately.
-      </div>
-    </details>
-  </aside>
-</div>
+    </section>
+  </div>
 {% endblock %}

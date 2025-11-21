@@ -91,7 +91,9 @@ services:
     networks: [proxy]
 
   docs:
-    build: ./docs
+    build:
+      context: ..
+      dockerfile: compose/docs/Dockerfile
     image: local/mkdocs-material-with-plugins:latest
     container_name: docs
     restart: unless-stopped
@@ -115,7 +117,6 @@ services:
     image: yuzutech/kroki:latest
     container_name: kroki
     restart: unless-stopped
-    ports: ["${KROKI_PORT:-8000}:8000"]
     environment:
       - KROKI_MAX_URI_LENGTH=16384
       - KROKI_MAX_CONTENT_LENGTH=1048576

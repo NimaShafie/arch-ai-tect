@@ -1,0 +1,67 @@
+<!-- server/templates/partials/auth_panel.html -->
+<div id="account-module" class="card">
+  <div class="hd">Account</div>
+  <div class="bd">
+    {% if current_user %}
+      <div class="row" style="justify-content:space-between; align-items:center">
+        <div>
+          <div><strong>{{ current_user.display_name or current_user.email }}</strong></div>
+          <div class="muted">{{ current_user.email }}</div>
+        </div>
+        <form method="post" action="/auth/logout">
+          <button class="btn" type="submit">Sign out</button>
+        </form>
+      </div>
+    {% else %}
+      <p class="muted" style="margin-top:0">
+        Sign in or create an account to keep your projects private and organized.
+      </p>
+
+      <div style="display:flex; gap:10px; margin-bottom:12px">
+        <button type="button" class="btn" id="tab-login">Sign in</button>
+        <button type="button" class="btn" id="tab-register">Register</button>
+      </div>
+
+      <div id="login-form">
+        <form method="post" action="/auth/login" autocomplete="on">
+          <div class="field">
+            <label>Email</label>
+            <input class="input" type="email" name="email" placeholder="you@domain.com" required />
+          </div>
+          <div class="field">
+            <label>Password</label>
+            <input class="input" type="password" name="password" placeholder="••••••••" required />
+          </div>
+          <button class="btn primary" type="submit">Sign in</button>
+        </form>
+      </div>
+
+      <div id="register-form" style="display:none">
+        <form method="post" action="/auth/register" autocomplete="on">
+          <div class="field">
+            <label>Display name</label>
+            <input class="input" type="text" name="display_name" placeholder="Your name" required />
+          </div>
+          <div class="field">
+            <label>Email</label>
+            <input class="input" type="email" name="email" placeholder="you@domain.com" required />
+          </div>
+          <div class="field">
+            <label>Password</label>
+            <input class="input" type="password" name="password" placeholder="Create a password" required />
+          </div>
+          <button class="btn primary" type="submit">Create account</button>
+        </form>
+      </div>
+
+      <script>
+        const $ = (s)=>document.querySelector(s);
+        const login = $("#login-form"), reg = $("#register-form");
+        $("#tab-login").addEventListener("click", ()=>{ login.style.display="block"; reg.style.display="none"; });
+        $("#tab-register").addEventListener("click", ()=>{ login.style.display="none"; reg.style.display="block"; });
+        // deep-link support: /ui#register
+        if (location.hash === "#register") { login.style.display="none"; reg.style.display="block"; }
+      </script>
+    {% endif %}
+  </div>
+</div>

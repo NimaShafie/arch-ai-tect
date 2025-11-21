@@ -35,7 +35,7 @@ Use these prompts and tools to generate C4 (Structurizr), Deployment/Sequence (P
 
 ---
 
-See the [Catalog](catalog.md) for all architecture packages.
+See the [Catalog](catalog/index.md) for all architecture packages.
 
 ---
 

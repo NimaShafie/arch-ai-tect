@@ -61,7 +61,7 @@ venv:
 
 bootstrap: venv
 	$(PIP) install -r server/requirements.txt
-	$(PIP) install mkdocs mkdocs-material mkdocs-macros-plugin pymdown-extensions
+	$(PIP) install mkdocs mkdocs-material mkdocs-macros-plugin mkdocs-exclude pymdown-extensions
 
 # --- API server ---------------------------------------------------------------
 api: venv

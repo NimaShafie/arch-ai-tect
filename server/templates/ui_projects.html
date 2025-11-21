@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}My Projects · ArchAiTect{% endblock %}
+
+{% block content %}
+<section class="card">
+  <h1>My Projects</h1>
+  <div class="bd">
+
+    {% if db_error %}
+      <p class="muted">{{ db_error }}</p>
+    {% endif %}
+
+    {% if current_user %}
+      {% if mine|length == 0 and (unassigned|length == 0) %}
+        <p class="muted">No projects yet.</p>
+        <p><a class="btn primary" href="/ui#">Create your first project</a></p>
+      {% endif %}
+
+      {% if mine|length > 0 %}
+        <h3 style="margin:8px 0 6px">Your projects</h3>
+        <div class="stack" style="gap:14px">
+          {% for p in mine %}
+          <div class="card" style="padding:14px">
+            <div class="row" style="justify-content:space-between;align-items:center">
+              <div>
+                <div>
+                  <a href="/ui/{{ p.slug }}"><strong>{{ p.name }}</strong></a>
+                  <span class="muted">· {{ p.slug }}</span>
+                </div>
+                <div class="muted">Created {{ p.created_at.strftime("%Y-%m-%d %H:%M") }}</div>
+              </div>
+              <div class="inline">
+                <form method="post" action="/ui/projects/{{ p.slug }}/delete" onsubmit="return confirm('Remove {{ p.name }} from dashboard? Files remain.');">
+                  <button class="btn" type="submit">Delete</button>
+                </form>
+                <a class="btn" href="{{ docs_base }}/projects/{{ p.slug }}/" target="_blank">Open in Docs</a>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      {% if unassigned|length > 0 %}
+      <details style="margin-top:18px">
+        <summary>Unassigned / legacy projects</summary>
+        <div class="stack" style="gap:10px; margin-top:10px">
+          {% for p in unassigned %}
+          <div class="card" style="padding:12px">
+            <div class="row" style="justify-content:space-between">
+              <div>
+                <a href="/ui/{{ p.slug }}"><strong>{{ p.name }}</strong></a>
+                <span class="muted">· {{ p.slug }}</span>
+              </div>
+              <a class="btn" href="{{ docs_base }}/projects/{{ p.slug }}/" target="_blank">Open in Docs</a>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </details>
+      {% endif %}
+
+    {% else %}
+      {% if guest_temps and guest_temps|length > 0 %}
+        <h3 style="margin:8px 0 6px">Temporary (this browser)</h3>
+        <p class="muted" style="margin-top:0">Not saved to your account. They may be cleared by browser cleanup.</p>
+        <div class="stack" style="gap:14px">
+          {% for p in guest_temps %}
+          <div class="card" style="padding:14px">
+            <div class="row" style="justify-content:space-between;align-items:center">
+              <div>
+                <div>
+                  <a href="/ui/{{ p.slug }}"><strong>{{ p.name }}</strong></a>
+                  <span class="muted">· {{ p.slug }}</span>
+                </div>
+                <div class="muted">Created {{ p.created_at.strftime("%Y-%m-%d %H:%M") }}</div>
+              </div>
+              <div class="inline">
+                <form method="post" action="/ui/projects/{{ p.slug }}/delete" onsubmit="return confirm('Delete temporary project {{ p.name }}? This will remove its files.');">
+                  <button class="btn" type="submit">Delete</button>
+                </form>
+                <a class="btn" href="{{ docs_base }}/projects/{{ p.slug }}/" target="_blank">Open in Docs</a>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">Sign in to save projects to your account, or create a temporary one below.</p>
+        <p><a class="btn primary" href="/ui#">Create a temporary project</a></p>
+      {% endif %}
+    {% endif %}
+
+  </div>
+</section>
+{% endblock %}

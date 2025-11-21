@@ -1,46 +1,141 @@
+# server/services/files.py
+from __future__ import annotations
+
 from pathlib import Path
-import json, hashlib, yaml, time
+import json
+import yaml
+import os
+import subprocess
+from typing import Any, Dict, Optional
 
-ROOT = Path(".").resolve()
-DOCS = ROOT / "docs" / "projects"
+# -----------------------------------------------------------------------------#
+# Constants
+# -----------------------------------------------------------------------------#
+DOCS_DIR = Path("docs")
+PROJECTS_DIR = DOCS_DIR / "projects"
 
-def ensure_project_tree(slug: str):
-    base = DOCS / slug
-    (base / "package").mkdir(parents=True, exist_ok=True)
-    (base / "diagrams").mkdir(parents=True, exist_ok=True)
-    return base
+INDEX_TEMPLATE = """# {title}
 
-def write_json(path: Path, data: dict):
-    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+This space is scaffolded and ready.
 
-def write_yaml(path: Path, data: dict):
-    path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+**Next steps (in the Workbench UI):**
+1. Fill the high-level brief → {ui_base}/ui/{slug}#brief
+2. Choose diagram types & dialects → {ui_base}/ui/{slug}#choices
+3. Generate artifacts → {ui_base}/ui/{slug}#generate
 
-def hash_file(path: Path) -> str:
-    h = hashlib.sha256()
-    h.update(path.read_bytes())
-    return h.hexdigest()
-
-def render_project_index(slug: str, name: str, nav_title: str):
-    base = DOCS / slug
-    md = f"""# {name}
-
-This page aggregates all generated assets for **{name}**.
-
-## Documents
-- [Specification](package/spec.md)
-- [System Requirements (SRS)](package/srs.md)
-- [Reference Architecture](package/reference-arch.md)
-- [Implementation Guide](package/implementation-guide.md)
-
-## Diagrams
-- C4 Context: `diagrams/c4-context.dsl`
-- C4 Container: `diagrams/c4-container.dsl`
-- Component: `diagrams/component.dsl`
-- Deployment (PlantUML): `diagrams/deployment.puml`
-- Sequence (PlantUML): `diagrams/sequence.puml`
-- Logical (Mermaid): `diagrams/logical.mmd`
-
-> Generated at {time.strftime("%Y-%m-%d %H:%M:%S")} (UTC).
+Once generated, diagrams and specifications will appear here under this project.
 """
-    (base / "index.md").write_text(md, encoding="utf-8")
+
+# -----------------------------------------------------------------------------#
+# Public API
+# -----------------------------------------------------------------------------#
+def ensure_project_tree(
+    slug: str,
+    name: Optional[str] = None,
+    nav_title: Optional[str] = None
+) -> Path:
+    """
+    Ensure docs/projects/<slug>/ exists with an index.md and a stub manifest.yaml.
+    Safe to call many times. Returns the project directory path.
+    """
+    pdir = PROJECTS_DIR / slug
+    pdir.mkdir(parents=True, exist_ok=True)
+
+    # Landing page
+    index_md = pdir / "index.md"
+    if not index_md.exists():
+        ui_base = os.getenv("UI_BASE", "https://workbench.shafie.org")
+        title = name or slug.replace("-", " ").title()
+        index_md.write_text(
+            INDEX_TEMPLATE.format(title=title, slug=slug, ui_base=ui_base),
+            encoding="utf-8",
+        )
+
+    # Minimal manifest for nav/title + sane defaults so MkDocs builds cleanly
+    manifest = pdir / "manifest.yaml"
+    if not manifest.exists():
+        manifest.write_text(
+            yaml.safe_dump(
+                {
+                    "slug": slug,
+                    "name": name or slug.replace("-", " ").title(),
+                    "nav_title": nav_title or name or slug.replace("-", " ").title(),
+                    "diagram_types": ["c4-context", "c4-container", "deployment", "sequence", "logical"],
+                    "dialects": ["structurizr", "plantuml", "mermaid"],
+                },
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
+
+    # Optionally kick a docs rebuild on first scaffold
+    try:
+        trigger_mkdocs_rebuild()
+    except Exception:
+        # never crash caller
+        pass
+
+    return pdir
+
+
+# Back-compat shim (older code may import this)
+def render_project_index(slug: str, title: Optional[str] = None) -> Path:
+    """
+    Backwards-compatible helper used by older orchestrators.
+    Simply calls ensure_project_tree() which writes index.md.
+    """
+    return ensure_project_tree(slug=slug, name=title)
+
+
+def write_json(path: Path, data: Dict[str, Any]):
+    """
+    Write a JSON file (pretty) and trigger a docs rebuild if under docs/.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    _maybe_rebuild(path)
+
+
+def write_yaml(path: Path, data: Dict[str, Any]):
+    """
+    Write a YAML file and trigger a docs rebuild if under docs/.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+    _maybe_rebuild(path)
+
+
+# -----------------------------------------------------------------------------#
+# Rebuild helpers
+# -----------------------------------------------------------------------------#
+def trigger_mkdocs_rebuild():
+    """
+    If MKDOCS_BUILD_CMD is set (e.g. 'mkdocs build --clean -q' or 'make docs'),
+    run it asynchronously. No-op if unset.
+    """
+    cmd = os.getenv("MKDOCS_BUILD_CMD", "").strip()
+    if not cmd:
+        return
+    try:
+        subprocess.Popen(
+            cmd,
+            shell=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        # Never crash caller due to rebuild failures.
+        pass
+
+
+def _maybe_rebuild(path: Path):
+    """
+    Trigger a rebuild iff the written path is inside the docs/ tree.
+    """
+    try:
+        resolved = path.resolve()
+        if DOCS_DIR.resolve() in resolved.parents or resolved.parent == DOCS_DIR.resolve():
+            trigger_mkdocs_rebuild()
+    except Exception:
+        # Never crash caller.
+        pass

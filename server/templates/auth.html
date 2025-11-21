@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Account · ArchAiTect{% endblock %}
+
+{% block content %}
+<section class="card" style="max-width:900px;margin:0 auto">
+  <h1>Account</h1>
+  <p class="muted">Sign in or create an account to keep your projects private and organized.</p>
+
+  <div class="row" role="tablist" style="gap:8px;margin:14px 0 6px">
+    <a href="#login" class="btn" onclick="switchTab('login'); return false;">Sign in</a>
+    <a href="#register" class="btn" onclick="switchTab('register'); return false;">Register</a>
+  </div>
+
+  <div id="pane-login" class="stack" style="margin-top:10px">
+    {% if login_error %}<div class="muted" style="color:#c23030">{{ login_error }}</div>{% endif %}
+    <form method="post" action="/auth/login" class="stack" style="max-width:520px">
+      <div class="field"><label>Email</label><input name="email" type="email" required /></div>
+      <div class="field"><label>Password</label><input name="password" type="password" required /></div>
+      <div><button class="btn btn-primary" type="submit">Sign in</button></div>
+    </form>
+  </div>
+
+  <div id="pane-register" class="stack" style="display:none;margin-top:10px">
+    {% if register_error %}<div class="muted" style="color:#c23030">{{ register_error }}</div>{% endif %}
+    <form method="post" action="/auth/register" class="stack" style="max-width:520px">
+      <div class="field"><label>Display name</label><input name="display_name" type="text" required /></div>
+      <div class="field"><label>Email</label><input name="email" type="email" required /></div>
+      <div class="field"><label>Password</label><input name="password" type="password" required /></div>
+      <div><button class="btn btn-primary" type="submit">Create account</button></div>
+    </form>
+  </div>
+</section>
+
+<script>
+  function switchTab(which){
+    document.getElementById('pane-login').style.display = (which === 'login') ? '' : 'none';
+    document.getElementById('pane-register').style.display = (which === 'register') ? '' : 'none';
+    history.replaceState(null, '', '#'+which);
+  }
+  // On load: honor hash
+  (function(){
+    const h = (location.hash||'').replace('#','');
+    if (h === 'register') switchTab('register'); else switchTab('login');
+  })();
+</script>
+{% endblock %}

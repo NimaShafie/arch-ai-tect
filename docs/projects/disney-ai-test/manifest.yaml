@@ -1,0 +1,13 @@
+slug: disney-ai-test
+name: Disney Ai Test
+nav_title: Disney Ai Test
+diagram_types:
+- c4-context
+- c4-container
+- deployment
+- sequence
+- logical
+dialects:
+- structurizr
+- plantuml
+- mermaid

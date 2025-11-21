@@ -89,3 +89,16 @@ logs/
 ~/.cache/huggingface/
 **/huggingface/
 scripts/disney_ai_plus_deploy
+
+# build + runtime
+site/
+__pycache__/
+*.pyc
+
+# local data
+data/*.sqlite*
+data/*.db
+
+# cachey project nav files (they’re regenerated)
+docs/_generated_projects_nav.yml
+docs/projects/_nav.generated.yml

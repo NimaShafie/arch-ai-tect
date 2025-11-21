@@ -11,9 +11,10 @@ theme:
 
 nav:
   - Home: index.md
-  - Projects: projects/INDEX.md
-  - Services: services.md
-  - Catalog: catalog.md
+  - Projects:
+      - Overview: projects/index.md
+  - Services: services/index.md
+  - Catalog: catalog/index.md
   - Diagrams:
       - Readme: diagrams/README.md
       - Booking Flow: diagrams/booking-sequence.md
@@ -36,8 +37,14 @@ plugins:
   - search
   - macros
   - kroki:
-      server_url: "https://kroki.shafie.org"   # <- correct key
-      # http_method: "POST"                   # enable if you have very large diagrams
+  - exclude:
+      glob:
+        - "package/**"                     # drafts with unresolved links
+        - "architecture/**"                # hide if you don’t want them yet
+        - "catalog.md"
+        - "services.md"
+        - "srs.md"
+        - "implementation-guide.md"
 
 extra:
   endpoints:

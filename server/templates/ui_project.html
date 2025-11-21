@@ -1,24 +1,98 @@
 {% extends "base.html" %}
+{% block title %}{{ project.name }} · ArchAiTect{% endblock %}
+
 {% block content %}
-<div class="card">
-  <h2>Project created ✅</h2>
-  <p>
-    <strong>{{ project.name }}</strong> (<span class="mono">{{ project.slug }}</span>) is ready.
-  </p>
+  <section class="card" style="margin-bottom:24px">
+    <div class="bd" style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap">
+      <div>
+        <div style="font-size:28px; font-weight:800">{{ project.name }}</div>
+        <div class="muted">slug: <code>{{ project.slug }}</code></div>
+        <div class="row" style="margin-top:12px">
+          <a class="pill" href="{{ docs_urls.project_home }}">Project Docs Home</a>
+          <a class="pill" href="{{ docs_urls.package_spec }}">Spec</a>
+          <a class="pill" href="{{ docs_urls.package_srs }}">SRS</a>
+          <a class="pill" href="{{ docs_urls.package_ref }}">Reference Architecture</a>
+          <a class="pill" href="{{ docs_urls.package_impl }}">Implementation Guide</a>
+          <a class="pill" href="{{ docs_urls.diagrams }}">Diagrams</a>
+        </div>
+      </div>
+      <div class="row">
+        <!-- Unified sizes/styles for both buttons -->
+        <a class="btn primary" href="/ui/{{ project.slug }}/generate" id="btn-generate">Generate Diagrams</a>
+        <a class="btn" href="{{ docs_urls.project_home }}" target="_blank" rel="noopener" id="btn-open-docs">Open Docs ↗</a>
+      </div>
+    </div>
+  </section>
 
-  <article>
-    <h3>Next steps</h3>
-    <ol>
-      <li>Fill the brief (high-level requirements)</li>
-      <li>Choose diagram types and dialects</li>
-      <li>Generate and refine</li>
-    </ol>
-  </article>
+  <div class="grid">
+    <!-- Requirements Brief -->
+    <section class="card" id="brief">
+      <div class="hd">Requirements Brief</div>
+      <div class="bd">
+        <p class="muted" style="margin-top:0">
+          Paste valid JSON. The editor auto-formats and softly validates as you type.
+        </p>
 
-  <div role="group">
-    <a role="button" href="{{ url_for('ui_home') }}">Create another</a>
-    <a role="button" class="secondary" href="{{ docs_base }}{{ docs_url }}" target="_blank" rel="noopener">Open in Docs</a>
-    <a role="button" class="secondary" href="/docs" target="_blank" rel="noopener">Open Swagger</a>
+        <form method="post" action="/ui/{{ project.slug }}/brief" autocomplete="off">
+          <textarea class="json-textarea" name="brief_text" id="brief_text">{{ brief_json }}</textarea>
+          <div class="row" style="margin-top:12px">
+            <button class="btn primary" type="submit">Save Brief</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- Diagram Choices -->
+    <section class="card" id="choices">
+      <div class="hd">Diagram Choices</div>
+      <div class="bd">
+        <form method="post" action="/ui/{{ project.slug }}/choices">
+          <div class="field"><label><input type="checkbox" name="c4_context" /> C4 Context</label></div>
+          <div class="field"><label><input type="checkbox" name="c4_container" /> C4 Container</label></div>
+          <div class="field"><label><input type="checkbox" name="c4_component" /> C4 Component</label></div>
+          <div class="field"><label><input type="checkbox" name="sequence" /> Sequence</label></div>
+          <div class="field"><label><input type="checkbox" name="deployment" /> Deployment</label></div>
+          <div class="field"><label><input type="checkbox" name="logical" /> Logical (Mermaid)</label></div>
+          <div class="row" style="margin-top:8px">
+            <button class="btn primary" type="submit">Save Choices</button>
+          </div>
+        </form>
+      </div>
+    </section>
   </div>
-</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // --- Auto-format/validate JSON in the brief editor ------------------------
+  const ta = document.getElementById('brief_text');
+  function pretty(s){
+    try {
+      const obj = JSON.parse(s);
+      return JSON.stringify(obj, null, 2) + "\n";
+    } catch { return s; }
+  }
+  // Format once on load
+  if (ta && ta.value) ta.value = pretty(ta.value);
+
+  // Debounced pretty/validate as user types
+  let tmr;
+  ta && ta.addEventListener('input', ()=>{
+    clearTimeout(tmr);
+    tmr = setTimeout(()=>{
+      const before = ta.selectionStart;
+      const v = pretty(ta.value);
+      // Only rewrite if it parses (keeps editing smooth)
+      try { JSON.parse(ta.value); ta.value = v; ta.setSelectionRange(before, before); }
+      catch {}
+    }, 350);
+  });
+
+  // --- Toasts on redirects --------------------------------------------------
+  const flags = {{ flags | tojson }};
+  if (flags.brief){ showToast('Brief saved.', 'success'); }
+  if (flags.choices){ showToast('Choices saved.', 'success'); }
+  if (flags.gen){ showToast('Generation started/completed.', 'success'); }
+  if (flags.generr){ showToast('Generation failed. Check server logs.', 'error', 4200); }
+</script>
 {% endblock %}

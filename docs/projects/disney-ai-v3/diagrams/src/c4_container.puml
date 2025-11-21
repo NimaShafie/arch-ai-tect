@@ -1,0 +1,19 @@
+@startuml
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+LAYOUT_WITH_LEGEND()
+
+title {{TITLE}} — Container
+
+Person(user, "User")
+System_Boundary(sys, "{{TITLE}}") {
+  Container(api, "API", "HTTP", "External API")
+  Container(svc, "Service", "App", "Business logic")
+  ContainerDb(db, "DB", "SQL/NoSQL", "State")
+}
+
+Rel(user, api, "Calls")
+Rel(api, svc, "Invokes")
+Rel(svc, db, "Reads/Writes")
+
+SHOW_LEGEND()
+@enduml
