@@ -5,10 +5,11 @@ import json
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from fastapi import APIRouter, Request, Form
+from fastapi import APIRouter, Request, Form, HTTPException
 from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from slugify import slugify
+from sqlmodel import select
 
 from ..db import get_session
 from ..models import Project
@@ -244,3 +245,27 @@ def generate(slug: str, refine: Optional[str] = Form(None)):
     except Exception:
         # Don’t surface 500—send the user back with a toast
         return RedirectResponse(url=f"/ui/{slug}?generr=1#generate", status_code=303)
+
+@router.get("/api/projects")
+def api_list_projects():
+    """
+    Return all projects for the Projects list on the home page.
+    Anyone can view; returns name, slug, and created_at (ISO).
+    """
+    with get_session() as session:
+        rows = session.exec(select(Project).order_by(Project.created_at.desc())).all()
+    # FastAPI will serialize datetimes to ISO 8601 automatically
+    return [
+        {"name": p.name, "slug": p.slug, "created_at": p.created_at}
+        for p in rows
+    ]
+
+@router.delete("/api/projects/{slug}")
+def api_delete_project(slug: str):
+    with get_session() as session:
+        proj: Optional[Project] = session.query(Project).filter(Project.slug == slug).first()
+        if not proj:
+            raise HTTPException(status_code=404, detail="Project not found")
+        session.delete(proj)
+        session.commit()
+    return {"ok": True}

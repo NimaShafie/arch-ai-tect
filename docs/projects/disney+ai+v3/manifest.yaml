@@ -1,0 +1,13 @@
+slug: disney+ai+v3
+name: Disney+AI+V3
+nav_title: Disney+AI+V3
+diagram_types:
+- c4-context
+- c4-container
+- deployment
+- sequence
+- logical
+dialects:
+- structurizr
+- plantuml
+- mermaid

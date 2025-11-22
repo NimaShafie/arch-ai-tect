@@ -29,7 +29,7 @@
       </div>
     </section>
 
-    <!-- Account + Info -->
+    <!-- What you get -->
     <section class="card">
       <div class="hd">What you get</div>
       <div class="bd">
@@ -42,4 +42,107 @@
       </div>
     </section>
   </div>
+
+  <!-- Projects -->
+  <section class="card" style="margin-top:24px">
+    <div class="hd">Projects</div>
+    <div class="bd">
+      <!-- header (grid for perfect alignment) -->
+      <div
+        class="proj-grid"
+	style="display:grid;grid-template-columns:1fr 120px 120px 160px;align-items:center;font-weight:700;margin-bottom:8px;padding:10px 12px"
+      >
+        <div>Project Name</div>
+        <div style="text-align:center">View</div>
+        <div style="text-align:center">Delete</div>
+        <div style="text-align:right">Date Created</div>
+      </div>
+
+      <div id="proj-list" class="stack" style="gap:10px">
+        <!-- rows injected by JS -->
+      </div>
+
+      <template id="proj-row-tpl">
+        <div
+          class="proj-grid"
+          style="display:grid;grid-template-columns:1fr 120px 120px 160px;align-items:center;border:1px solid var(--border);border-radius:12px;padding:10px 12px;background:#fff"
+        >
+          <div class="proj-name" style="min-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+
+          <div style="text-align:center">
+            <a class="btn" data-view href="#">View</a>
+          </div>
+
+          <div style="text-align:center">
+            <!-- red text as requested -->
+            <button class="btn" data-delete type="button" style="color:#b91c1c">Delete</button>
+          </div>
+
+          <div class="proj-date" style="text-align:right"></div>
+        </div>
+      </template>
+    </div>
+  </section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function toMDY(v){
+    const d = new Date(v);
+    if (isNaN(d)) return '';
+    const mm = String(d.getMonth()+1).padStart(2,'0');
+    const dd = String(d.getDate()).padStart(2,'0');
+    const yyyy = d.getFullYear();
+    return `${mm}/${dd}/${yyyy}`;
+  }
+
+  async function loadAll(){
+    try{
+      const r = await fetch('/api/projects', { headers:{ 'Accept':'application/json' }});
+      if(!r.ok) throw new Error(await r.text());
+      const items = await r.json();
+
+      const host = document.getElementById('proj-list');
+      const tpl  = document.getElementById('proj-row-tpl');
+      host.innerHTML = '';
+
+      if (!Array.isArray(items) || items.length === 0){
+        const empty = document.createElement('div');
+        empty.className = 'muted';
+        empty.textContent = 'No projects found.';
+        host.appendChild(empty);
+        return;
+      }
+
+      for (const p of items){
+        const rowFrag = tpl.content.cloneNode(true);
+        const rowEl   = rowFrag.firstElementChild;
+
+        rowEl.querySelector('.proj-name').textContent = p.name || p.slug || '(untitled)';
+        rowEl.querySelector('[data-view]').href = `/ui/${encodeURIComponent(p.slug)}`;
+        rowEl.querySelector('.proj-date').textContent = toMDY(p.created_at);
+
+        rowEl.querySelector('[data-delete]').addEventListener('click', async (e) => {
+          e.preventDefault();
+          if (!confirm(`Delete project "${p.name || p.slug}"? This cannot be undone.`)) return;
+          const resp = await fetch(`/api/projects/${encodeURIComponent(p.slug)}`, { method:'DELETE' });
+          if (!resp.ok){
+            const msg = await resp.text();
+            alert('Delete failed: ' + msg);
+            return;
+          }
+          rowEl.remove();               // remove the specific row
+          showToast('Project deleted.', 'success');
+        });
+
+        host.appendChild(rowFrag);
+      }
+    }catch(err){
+      console.error(err);
+      showToast('Failed to load projects.', 'error', 4000);
+    }
+  }
+
+  loadAll();
+</script>
 {% endblock %}

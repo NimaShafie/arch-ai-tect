@@ -1,0 +1,100 @@
+<!-- server/templates/ui.html -->
+{% extends "base.html" %}
+{% block title %}Workbench UI · ArchAiTect{% endblock %}
+
+{% block content %}
+  <section class="card">
+    <h2 class="h1">New Architecture Project</h2>
+    <p class="muted">Create a project namespace; we’ll scaffold its docs directory so MkDocs can pick it up.</p>
+
+    <form id="createForm" autocomplete="off" style="margin-top:12px;">
+      <div class="form-row">
+        <label for="name">Project Name</label>
+        <input id="name" name="name" class="input" type="text" placeholder="e.g., Disney+Ai+" required />
+      </div>
+
+      <div class="form-row">
+        <label for="slug">Slug <span class="muted">(optional)</span></label>
+        <input id="slug" name="slug" class="input" type="text" placeholder="auto-generated from name if left blank" />
+      </div>
+
+      <div style="margin-top:14px;">
+        <button type="submit" class="btn">Create Project</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2 class="h1" style="margin-bottom:12px;">Projects</h2>
+    <div id="projects" class="projects">
+      {% for p in projects %}
+      <div class="project-row" data-name="{{ p.name | e }}" data-slug="{{ p.slug | e }}">
+        <div class="project-row__meta">
+          <div class="project-row__title">{{ p.name }}</div>
+          <div class="project-row__slug">/{{ p.slug }}</div>
+        </div>
+        <div class="project-row__actions">
+          <a class="btn btn--ghost" href="/ui/{{ p.slug }}">Open</a>
+          <a class="btn btn--ghost" target="_blank" rel="noopener" href="https://docs.shafie.org/projects/{{ p.slug }}/">Docs</a>
+          <button class="btn btn--danger" data-delete="{{ p.slug }}">Delete</button>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+  // Client-side filter using the top search bar
+  const searchEl = document.querySelector('#globalSearch');
+  const list = document.querySelector('#projects');
+  function applyFilter() {
+    const q = (searchEl.value || '').trim().toLowerCase();
+    for (const row of list.querySelectorAll('.project-row')) {
+      const name = row.dataset.name.toLowerCase();
+      const slug = row.dataset.slug.toLowerCase();
+      const match = !q || name.includes(q) || slug.includes(q);
+      row.style.display = match ? '' : 'none';
+    }
+  }
+  searchEl.addEventListener('input', applyFilter);
+
+  // Create
+  document.querySelector('#createForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = {
+      name: e.target.name.value,
+      slug: e.target.slug.value || undefined,
+    };
+    const r = await fetch('/api/projects', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(data),
+    });
+    if (!r.ok) {
+      const msg = await r.text();
+      alert('Create failed: ' + msg);
+      return;
+    }
+    location.reload();
+  });
+
+  // Delete (with confirm)
+  document.querySelector('#projects').addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-delete]');
+    if (!btn) return;
+    const slug = btn.getAttribute('data-delete');
+    if (!confirm(`Delete project "${slug}" and its generated files?`)) return;
+
+    const r = await fetch(`/api/projects/${encodeURIComponent(slug)}`, { method:'DELETE' });
+    if (!r.ok) {
+      const msg = await r.text();
+      alert('Delete failed: ' + msg);
+      return;
+    }
+    // Remove row immediately for responsiveness
+    btn.closest('.project-row').remove();
+  });
+</script>
+{% endblock %}
