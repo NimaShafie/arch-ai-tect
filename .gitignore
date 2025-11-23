@@ -102,3 +102,9 @@ data/*.db
 # cachey project nav files (they’re regenerated)
 docs/_generated_projects_nav.yml
 docs/projects/_nav.generated.yml
+
+# --- ArchAiTect generated project docs (keep only scaffolding) ---
+/docs/projects/*
+!/docs/projects/.keep
+!/docs/projects/index.md
+!/docs/projects/_nav.generated.yml
