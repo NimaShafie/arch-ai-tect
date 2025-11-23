@@ -17,7 +17,6 @@
         </div>
       </div>
       <div class="row">
-        <!-- Unified sizes/styles for both buttons -->
         <a class="btn primary" href="/ui/{{ project.slug }}/generate" id="btn-generate">Generate Diagrams</a>
         <a class="btn" href="{{ docs_urls.project_home }}" target="_blank" rel="noopener" id="btn-open-docs">Open Docs ↗</a>
       </div>
@@ -33,10 +32,52 @@
           Paste valid JSON. The editor auto-formats and softly validates as you type.
         </p>
 
-        <form method="post" action="/ui/{{ project.slug }}/brief" autocomplete="off">
-          <textarea class="json-textarea" name="brief_text" id="brief_text">{{ brief_json }}</textarea>
+        <!-- JSON textarea styles -->
+        <style>
+          .json-textarea{
+            width: 100%;
+            min-height: 260px;
+            padding: 14px 16px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            border-radius: 10px;
+            border: 1px solid var(--outline, rgba(0,0,0,.08));
+            background: var(--code-bg, var(--surface-1, #f7f8fb));
+            color: var(--fg, #1b1f24);
+            box-shadow: inset 0 1px 0 rgba(0,0,0,.02);
+            resize: vertical;
+          }
+          .json-textarea:focus{
+            outline: none;
+            border-color: var(--primary, #2962ff);
+            box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary, #2962ff) 25%, transparent);
+            background: var(--surface-1, #f7f8fb);
+          }
+          .json-textarea.error{
+            border-color:#ef4444;
+            box-shadow:0 0 0 3px rgba(239,68,68,.18);
+          }
+          #brief_error{
+            margin-top:8px;
+            color:#b91c1c;
+            font-size:12.5px;
+          }
+        </style>
+
+        <form method="post" action="/ui/{{ project.slug }}/brief" autocomplete="off" id="form-brief">
+          <textarea
+            class="json-textarea"
+            name="brief_text"
+            id="brief_text"
+            placeholder='{
+  "goal": "Describe the system purpose",
+  "actors": ["User","System"],
+  "scenarios": [{"name":"Login","steps":["User enters credentials","System verifies","User redirected"]}]
+}'>{{ brief_json }}</textarea>
+          <div id="brief_error" hidden></div>
           <div class="row" style="margin-top:12px">
-            <button class="btn primary" type="submit">Save Brief</button>
+            <button class="btn primary" type="submit" id="btn-save-brief">Save Brief</button>
           </div>
         </form>
       </div>
@@ -46,15 +87,143 @@
     <section class="card" id="choices">
       <div class="hd">Diagram Choices</div>
       <div class="bd">
-        <form method="post" action="/ui/{{ project.slug }}/choices">
-          <div class="field"><label><input type="checkbox" name="c4_context" /> C4 Context</label></div>
-          <div class="field"><label><input type="checkbox" name="c4_container" /> C4 Container</label></div>
-          <div class="field"><label><input type="checkbox" name="c4_component" /> C4 Component</label></div>
-          <div class="field"><label><input type="checkbox" name="sequence" /> Sequence</label></div>
-          <div class="field"><label><input type="checkbox" name="deployment" /> Deployment</label></div>
-          <div class="field"><label><input type="checkbox" name="logical" /> Logical (Mermaid)</label></div>
-          <div class="row" style="margin-top:8px">
-            <button class="btn primary" type="submit">Save Choices</button>
+        <style>
+          #choices .bd {
+            min-height: 520px;
+            display: flex;
+            flex-direction: column;
+          }
+          #choices form {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            height: 100%;
+          }
+          #choices .fields {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(240px, 1fr));
+            grid-template-rows: repeat(3, 1fr);
+            gap: 16px 22px;
+            flex: 1;
+            align-content: stretch;
+            width: 100%;
+          }
+          /* Tile */
+          #choices .tile {
+            position: relative;
+            height: 100%;
+            min-height: 96px;
+            border: 1px solid var(--outline, rgba(0,0,0,.08));
+            background: var(--surface-1, #f7f8fb);
+            border-radius: 12px;
+            transition: transform .08s ease, box-shadow .15s ease, border-color .15s ease, background .15s ease;
+            overflow: visible;
+            z-index: 1;
+          }
+          #choices .tile:hover {
+            transform: translateY(-1px);
+            border-color: color-mix(in srgb, var(--primary, #2962ff) 22%, transparent);
+            box-shadow: 0 6px 22px rgba(0,0,0,.07);
+          }
+          /* Full-tile label hit area (click anywhere toggles checkbox) */
+          #choices .tile-hit{
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 16px;
+            padding-right: 44px; /* room for info icon */
+            cursor: pointer;
+            border-radius: 12px;
+          }
+          #choices .tile input[type="checkbox"]{ transform: translateY(1px); }
+          #choices .label-text{
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+          /* Info icon (does not toggle checkbox) */
+          #choices .info {
+            position: absolute;
+            right: 12px;
+            top: 12px;
+            display: inline-grid;
+            place-items: center;
+            width: 20px;
+            height: 20px;
+            border-radius: 999px;
+            border: 1px solid rgba(0,0,0,.18);
+            background: linear-gradient(#f7f7f9, #efeff3);
+            color: #6b7280;
+            font-size: 12px;
+            line-height: 1;
+            user-select: none;
+            z-index: 3;
+          }
+        </style>
+
+        <form method="post" action="/ui/{{ project.slug }}/choices" id="form-choices">
+          <div class="fields">
+
+            <div class="tile">
+              <label class="tile-hit">
+                <input type="checkbox" name="c4_context" />
+                <span class="label-text">C4 Context</span>
+              </label>
+              <span class="info" aria-label="What is C4 Context"
+                    data-tip="The highest-level C4 diagram. Shows the system in its environment: primary users, external systems, and major relationships.">i</span>
+            </div>
+
+            <div class="tile">
+              <label class="tile-hit">
+                <input type="checkbox" name="c4_container" />
+                <span class="label-text">C4 Container</span>
+              </label>
+              <span class="info" aria-label="What is C4 Container"
+                    data-tip="Breaks the system into deployable containers (web app, API, services, databases, queues) and how they communicate.">i</span>
+            </div>
+
+            <div class="tile">
+              <label class="tile-hit">
+                <input type="checkbox" name="c4_component" />
+                <span class="label-text">C4 Component</span>
+              </label>
+              <span class="info" aria-label="What is C4 Component"
+                    data-tip="Zooms into a single container to show key components/modules inside it and their dependencies and responsibilities.">i</span>
+            </div>
+
+            <div class="tile">
+              <label class="tile-hit">
+                <input type="checkbox" name="sequence" />
+                <span class="label-text">Sequence</span>
+              </label>
+              <span class="info" aria-label="What is a Sequence diagram"
+                    data-tip="Time-ordered interactions for a scenario (e.g., login, checkout). Helpful for step-by-step flows across services.">i</span>
+            </div>
+
+            <div class="tile">
+              <label class="tile-hit">
+                <input type="checkbox" name="deployment" />
+                <span class="label-text">Deployment</span>
+              </label>
+              <span class="info" aria-label="What is a Deployment diagram"
+                    data-tip="Shows infrastructure nodes (regions, clusters, pods, VMs) and where containers run, including runtime and networking.">i</span>
+            </div>
+
+            <div class="tile">
+              <label class="tile-hit">
+                <input type="checkbox" name="logical" />
+                <span class="label-text">Logical (Mermaid)</span>
+              </label>
+              <span class="info" aria-label="What is a Logical diagram"
+                    data-tip="High-level logical view (Mermaid) of domains/modules and relationships—useful for early design discussions.">i</span>
+            </div>
+
+          </div>
+
+          <div class="row" style="margin-top:12px">
+            <button class="btn primary" type="submit" id="btn-save-choices">Save Choices</button>
           </div>
         </form>
       </div>
@@ -66,27 +235,207 @@
 <script>
   // --- Auto-format/validate JSON in the brief editor ------------------------
   const ta = document.getElementById('brief_text');
-  function pretty(s){
+
+  function parseRelaxed(s) {
+    s = (s ?? "").trim();
+    const looksQuoted = (s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"));
     try {
-      const obj = JSON.parse(s);
-      return JSON.stringify(obj, null, 2) + "\n";
-    } catch { return s; }
+      let first = JSON.parse(s);
+      if (typeof first === 'string') {
+        try { return JSON.parse(first); }
+        catch {
+          const maybeJson = first.replaceAll('\\n', '\n');
+          try { return JSON.parse(maybeJson); } catch {}
+          return first;
+        }
+      }
+      return first;
+    } catch {
+      if (looksQuoted) { try { return JSON.parse(s.slice(1, -1)); } catch {} }
+      return s;
+    }
   }
-  // Format once on load
+
+  function pretty(s){
+    const parsed = parseRelaxed(s);
+    if (parsed && (typeof parsed === 'object')) {
+      return JSON.stringify(parsed, null, 2) + "\n";
+    }
+    return s;
+  }
+
   if (ta && ta.value) ta.value = pretty(ta.value);
 
-  // Debounced pretty/validate as user types
   let tmr;
   ta && ta.addEventListener('input', ()=>{
     clearTimeout(tmr);
     tmr = setTimeout(()=>{
-      const before = ta.selectionStart;
+      const start = ta.selectionStart;
       const v = pretty(ta.value);
-      // Only rewrite if it parses (keeps editing smooth)
-      try { JSON.parse(ta.value); ta.value = v; ta.setSelectionRange(before, before); }
-      catch {}
-    }, 350);
+      if (v !== ta.value) {
+        ta.value = v;
+        const pos = Math.min(v.length, start);
+        ta.setSelectionRange(pos, pos);
+      }
+    }, 300);
   });
+
+  // --- Body-level tooltip (fixed, clamped, no scrollbars) -------------------
+  (function setupInfoTooltips(){
+    const tooltip = document.createElement('div');
+    tooltip.id = 'aw-tooltip';
+    Object.assign(tooltip.style, {
+      position: 'fixed',
+      left: '0px',
+      top: '0px',
+      transform: 'translate(-9999px,-9999px)',
+      padding: '10px 12px',
+      borderRadius: '10px',
+      background: '#111827',
+      color: '#fff',
+      fontSize: '12px',
+      lineHeight: '1.45',
+      maxWidth: '46ch',
+      width: 'max-content',
+      boxShadow: '0 10px 24px rgba(0,0,0,.18)',
+      pointerEvents: 'none',
+      zIndex: '100000',
+      opacity: '0',
+      transition: 'opacity .12s ease'
+    });
+    document.body.appendChild(tooltip);
+
+    function show(el, evt){
+      tooltip.textContent = el.getAttribute('data-tip') || '';
+      tooltip.style.opacity = '1';
+      position(evt);
+    }
+    function hide(){
+      tooltip.style.opacity = '0';
+      tooltip.style.transform = 'translate(-9999px,-9999px)';
+    }
+    function position(evt){
+      const pad = 12, vw = window.innerWidth, vh = window.innerHeight;
+      tooltip.style.transform = `translate(${evt.clientX + pad}px, ${evt.clientY + pad}px)`;
+      const rect = tooltip.getBoundingClientRect();
+      let x = evt.clientX + pad, y = evt.clientY + pad;
+      if (x + rect.width + pad > vw) x = Math.max(pad, vw - rect.width - pad);
+      if (y + rect.height + pad > vh) y = Math.max(pad, vh - rect.height - pad);
+      tooltip.style.transform = `translate(${x}px, ${y}px)`;
+    }
+
+    document.querySelectorAll('#choices .info').forEach(el=>{
+      el.addEventListener('mouseenter', e => show(el, e));
+      el.addEventListener('mousemove', position);
+      el.addEventListener('mouseleave', hide);
+      el.addEventListener('mousedown', e => e.preventDefault());
+    });
+  })();
+
+  // --- Persist state across POST/redirects (localStorage) -------------------
+  (function persistState(){
+    const slug = {{ project.slug | tojson }};
+    const keyChoices = `aw:choices:${slug}`;
+    const keyBrief = `aw:brief:${slug}`;
+
+    const chkSelector = '#choices input[type="checkbox"]';
+
+    function readChoices(){
+      try { return JSON.parse(localStorage.getItem(keyChoices) || '[]'); }
+      catch { return []; }
+    }
+    function writeChoices(list){
+      try { localStorage.setItem(keyChoices, JSON.stringify(list)); } catch {}
+    }
+    function collectChoices(){
+      return Array.from(document.querySelectorAll(chkSelector))
+        .filter(i => i.checked)
+        .map(i => i.name);
+    }
+    function applyChoices(list){
+      const set = new Set(list || []);
+      document.querySelectorAll(chkSelector).forEach(i => {
+        i.checked = set.has(i.name);
+      });
+    }
+
+    function readBrief(){
+      try { return localStorage.getItem(keyBrief) || ''; } catch { return ''; }
+    }
+    function writeBrief(text){
+      try { localStorage.setItem(keyBrief, text ?? ''); } catch {}
+    }
+
+    // Restore on load
+    applyChoices(readChoices());
+    const savedBrief = readBrief();
+    if (savedBrief && ta) ta.value = savedBrief;
+
+    // Save on input/change
+    document.querySelectorAll(chkSelector).forEach(i => {
+      i.addEventListener('change', () => writeChoices(collectChoices()));
+    });
+    ta && ta.addEventListener('input', () => writeBrief(ta.value));
+
+    // Save immediately on submits / generate click
+    const formBrief = document.getElementById('form-brief');
+    const formChoices = document.getElementById('form-choices');
+    const btnGenerate = document.getElementById('btn-generate');
+
+    formBrief && formBrief.addEventListener('submit', () => {
+      writeBrief(ta ? ta.value : '');
+      writeChoices(collectChoices());
+    });
+
+    formChoices && formChoices.addEventListener('submit', () => {
+      writeBrief(ta ? ta.value : '');
+      writeChoices(collectChoices());
+    });
+
+    btnGenerate && btnGenerate.addEventListener('click', () => {
+      writeBrief(ta ? ta.value : '');
+      writeChoices(collectChoices());
+    });
+  })();
+
+  // --- Strict JSON validation & feedback on Save Brief ---------------------
+  (function briefValidation(){
+    const form = document.getElementById('form-brief');
+    if (!form || !ta) return;
+    const err = document.getElementById('brief_error');
+
+    function isValidJsonObjectOrArray(text){
+      try {
+        const parsed = JSON.parse(text);
+        return parsed !== null && typeof parsed === 'object';
+      } catch { return false; }
+    }
+
+    form.addEventListener('submit', (e)=>{
+      const text = (ta.value || '').trim();
+      if (!isValidJsonObjectOrArray(text)){
+        e.preventDefault();
+        if (err){
+          err.textContent = 'Invalid JSON. Please provide a valid JSON object/array (tip: use { ... } or [ ... ]).';
+          err.hidden = false;
+        }
+        ta.classList.add('error');
+        if (typeof showToast === 'function'){
+          showToast('Invalid JSON in Brief. Not saved.', 'error', 4200);
+        }
+        // Keep focus for immediate correction
+        ta.focus();
+        return;
+      }
+      // Clear any previous error on success
+      if (err){ err.hidden = true; }
+      ta.classList.remove('error');
+      // Optional feedback before round-trip
+      if (typeof showToast === 'function'){
+        showToast('Saving brief…', 'success');
+      }
+    });
+  })();
 
   // --- Toasts on redirects --------------------------------------------------
   const flags = {{ flags | tojson }};
