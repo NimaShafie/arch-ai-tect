@@ -2,12 +2,24 @@
 {% extends "base.html" %}
 {% block title %}Workbench UI · ArchAiTect{% endblock %}
 
+{% block head %}
+<style>
+  /* Gentle vertical rhythm for the create form, without touching global styles */
+  .form-row { display:flex; flex-direction:column; gap:8px; margin: 14px 0; }
+  .form-row label { font-weight:600; }
+  /* Keep inputs as-is; just ensure there is breathing room below the last input */
+  #createForm { margin-top: 12px; margin-bottom: 8px; }
+</style>
+{% endblock %}
+
 {% block content %}
   <section class="card">
     <h2 class="h1">New Architecture Project</h2>
-    <p class="muted">Create a project namespace; we’ll scaffold its docs directory so MkDocs can pick it up.</p>
+    <p class="muted" style="padding-left:2px;padding-right:2px">
+      Create a project namespace; we’ll scaffold its docs and keep artifacts in sync.
+    </p>
 
-    <form id="createForm" autocomplete="off" style="margin-top:12px;">
+    <form id="createForm" autocomplete="off">
       <div class="form-row">
         <label for="name">Project Name</label>
         <input id="name" name="name" class="input" type="text" placeholder="e.g., Disney+Ai+" required />
@@ -15,28 +27,33 @@
 
       <div class="form-row">
         <label for="slug">Slug <span class="muted">(optional)</span></label>
-        <input id="slug" name="slug" class="input" type="text" placeholder="auto-generated from name if left blank" />
+        <input id="slug" name="slug" class="input" type="text" placeholder="auto-from-name" />
       </div>
 
-      <div style="margin-top:14px;">
-        <button type="submit" class="btn">Create Project</button>
+      <div class="form-row">
+        <label for="nav_title">Nav Title <span class="muted">(optional)</span></label>
+        <input id="nav_title" name="nav_title" class="input" type="text" placeholder="defaults to name" />
+      </div>
+
+      <div style="margin-top:12px;">
+        <button type="submit" class="btn primary">Create</button>
       </div>
     </form>
   </section>
 
-  <section class="card">
+  <section class="card" style="margin-top:20px;">
     <h2 class="h1" style="margin-bottom:12px;">Projects</h2>
-    <div id="projects" class="projects">
+    <div id="projects" class="projects" style="padding-left:20px;padding-right:20px;">
       {% for p in projects %}
-      <div class="project-row" data-name="{{ p.name | e }}" data-slug="{{ p.slug | e }}">
-        <div class="project-row__meta">
-          <div class="project-row__title">{{ p.name }}</div>
-          <div class="project-row__slug">/{{ p.slug }}</div>
+      <div class="project-row" data-name="{{ p.name | e }}" data-slug="{{ p.slug | e }}" style="display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--border);">
+        <div class="project-row__meta" style="display:flex;flex-direction:column;gap:4px;">
+          <div class="project-row__title" style="font-weight:600">{{ p.name }}</div>
+          <div class="project-row__slug muted">/{{ p.slug }}</div>
         </div>
-        <div class="project-row__actions">
-          <a class="btn btn--ghost" href="/ui/{{ p.slug }}">Open</a>
-          <a class="btn btn--ghost" target="_blank" rel="noopener" href="https://docs.shafie.org/projects/{{ p.slug }}/">Docs</a>
-          <button class="btn btn--danger" data-delete="{{ p.slug }}">Delete</button>
+        <div class="project-row__actions" style="display:flex;gap:10px;align-items:center;">
+          <a class="btn" href="/ui/{{ p.slug }}">View</a>
+          <button class="btn" style="color:#dc2626;border-color:#fecaca;background:#fff5f5" data-delete="{{ p.slug }}">Delete</button>
+          <div class="muted" style="min-width:120px;text-align:right">{{ p.created_at.strftime("%m/%d/%Y") if p.created_at else "" }}</div>
         </div>
       </div>
       {% endfor %}
@@ -44,28 +61,17 @@
   </section>
 {% endblock %}
 
-{% block body_extra %}
-<script>
-  // Client-side filter using the top search bar
-  const searchEl = document.querySelector('#globalSearch');
-  const list = document.querySelector('#projects');
-  function applyFilter() {
-    const q = (searchEl.value || '').trim().toLowerCase();
-    for (const row of list.querySelectorAll('.project-row')) {
-      const name = row.dataset.name.toLowerCase();
-      const slug = row.dataset.slug.toLowerCase();
-      const match = !q || name.includes(q) || slug.includes(q);
-      row.style.display = match ? '' : 'none';
-    }
-  }
-  searchEl.addEventListener('input', applyFilter);
+{% block body_extra %}{% endblock %}
 
+{% block scripts %}
+<script>
   // Create
   document.querySelector('#createForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const data = {
       name: e.target.name.value,
       slug: e.target.slug.value || undefined,
+      nav_title: e.target.nav_title?.value || undefined,
     };
     const r = await fetch('/api/projects', {
       method:'POST',
@@ -93,7 +99,6 @@
       alert('Delete failed: ' + msg);
       return;
     }
-    // Remove row immediately for responsiveness
     btn.closest('.project-row').remove();
   });
 </script>

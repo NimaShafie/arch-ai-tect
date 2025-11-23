@@ -14,6 +14,8 @@ app = FastAPI(title="Architecture Workbench Registry")
 static_dir = Path(__file__).parent / "static"
 if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+    # Back-compat for older templates that referenced /assets
+    app.mount("/assets", StaticFiles(directory=str(static_dir)), name="assets")
 
 # initialize DB tables on process start
 @app.on_event("startup")

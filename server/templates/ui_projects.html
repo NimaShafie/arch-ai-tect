@@ -31,9 +31,9 @@
               </div>
               <div class="inline">
                 <form method="post" action="/ui/projects/{{ p.slug }}/delete" onsubmit="return confirm('Remove {{ p.name }} from dashboard? Files remain.');">
-                  <button class="btn" type="submit">Delete</button>
+                  <button class="btn" style="color:#dc2626;border-color:#fecaca;background:#fff5f5" type="submit">Delete</button>
                 </form>
-                <a class="btn" href="{{ docs_base }}/projects/{{ p.slug }}/" target="_blank">Open in Docs</a>
+                <a class="btn" href="{{ docs_base }}/projects/{{ p.slug }}/" target="_blank" rel="noopener">Open in Docs</a>
               </div>
             </div>
           </div>
@@ -52,7 +52,7 @@
                 <a href="/ui/{{ p.slug }}"><strong>{{ p.name }}</strong></a>
                 <span class="muted">· {{ p.slug }}</span>
               </div>
-              <a class="btn" href="{{ docs_base }}/projects/{{ p.slug }}/" target="_blank">Open in Docs</a>
+              <a class="btn" href="{{ docs_base }}/projects/{{ p.slug }}/" target="_blank" rel="noopener">Open in Docs</a>
             </div>
           </div>
           {% endfor %}
@@ -77,9 +77,9 @@
               </div>
               <div class="inline">
                 <form method="post" action="/ui/projects/{{ p.slug }}/delete" onsubmit="return confirm('Delete temporary project {{ p.name }}? This will remove its files.');">
-                  <button class="btn" type="submit">Delete</button>
+                  <button class="btn" style="color:#dc2626;border-color:#fecaca;background:#fff5f5" type="submit">Delete</button>
                 </form>
-                <a class="btn" href="{{ docs_base }}/projects/{{ p.slug }}/" target="_blank">Open in Docs</a>
+                <a class="btn" href="{{ docs_base }}/projects/{{ p.slug }}/" target="_blank" rel="noopener">Open in Docs</a>
               </div>
             </div>
           </div>

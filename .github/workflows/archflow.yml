@@ -81,15 +81,14 @@ jobs:
               docs/packages/__template__.md > "docs/packages/$PID.md"
           fi
 
-          # update catalog
-          python3 - <<'PY'
-import pathlib
-root = pathlib.Path("packages")
-items = sorted([p.name for p in root.iterdir() if p.is_dir()])
-out = ["# Architecture Catalog", ""]
-for s in items: out.append(f"- [{s}](packages/{s}.md)")
-pathlib.Path("docs/catalog.md").write_text("\n".join(out)+"\n", encoding="utf-8")
-PY
+      - name: Update catalog (YAML-safe; avoids heredoc parsing issues)
+        shell: bash
+        run: |
+          python3 -c "import pathlib; \
+from pathlib import Path; \
+root=Path('packages'); \
+items=sorted([p.name for p in root.iterdir() if p.is_dir()]); \
+Path('docs/catalog.md').write_text('# Architecture Catalog\\n\\n' + '\\n'.join(f'- [{s}](packages/{s}.md)' for s in items) + '\\n', encoding='utf-8')"
 
       - name: Validate intake is edited (fail fast if still template)
         shell: bash
@@ -248,7 +247,7 @@ PY
         run: npm -y add @notionhq/client
       - name: Create Notion tasks
         env:
-          NOTION_TOKEN:      ${{ secrets.NOTION_API_TOKEN }}
+          NOTION_TOKEN:       ${{ secrets.NOTION_API_TOKEN }}
           NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
         run: node scripts/notion-publish.js
 

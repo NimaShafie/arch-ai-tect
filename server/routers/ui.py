@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -37,11 +38,13 @@ def _docs_urls(slug: str) -> Dict[str, str]:
 def ui_root():
     return RedirectResponse(url="/ui", status_code=303)
 
-@router.get("/ui", response_class=HTMLResponse)
+# Accept both /ui and /ui/
+@router.get("/ui", response_class=HTMLResponse, include_in_schema=False)
+@router.get("/ui/", response_class=HTMLResponse, include_in_schema=False)
 def ui_index(request: Request):
     return templates.TemplateResponse("ui_home.html", {"request": request})
 
-# ---- Create project (GET & POST) -------------------------------------------
+# ---- Create project (GET & POST) from /ui/create ---------------------------
 @router.api_route("/ui/create", methods=["GET", "POST"], include_in_schema=False)
 def ui_create(
     request: Request,
@@ -52,13 +55,15 @@ def ui_create(
     if request.method != "POST":
         return RedirectResponse(url="/ui", status_code=303)
 
+    return _create_project_and_scaffold(name=name, slug=slug, nav_title=nav_title)
+
+def _create_project_and_scaffold(*, name: Optional[str], slug: Optional[str], nav_title: Optional[str]):
     final_slug = slugify((slug or name or "")).strip("-")
     if not final_slug:
         return RedirectResponse(url="/ui", status_code=303)
 
     final_title = (nav_title or name or final_slug).strip()
 
-    # Upsert project
     with get_session() as session:
         exists: Optional[Project] = session.query(Project).filter(Project.slug == final_slug).first()
         if not exists:
@@ -68,7 +73,6 @@ def ui_create(
             session.add(proj)
             session.commit()
 
-    # Scaffold docs tree
     proj_dir = Path("docs") / "projects" / final_slug
     proj_dir.mkdir(parents=True, exist_ok=True)
     idx = proj_dir / "index.md"
@@ -82,7 +86,6 @@ def ui_create(
             "Once generated, diagrams and specifications will appear here under this project.\n",
             encoding="utf-8",
         )
-    # Ensure a diagrams index exists so Docs isn’t empty after clicking “Open Docs”
     diag_dir = proj_dir / "diagrams"
     diag_dir.mkdir(parents=True, exist_ok=True)
     diag_index = diag_dir / "index.md"
@@ -93,7 +96,6 @@ def ui_create(
             encoding="utf-8",
         )
 
-    # Refresh nav (best effort)
     try:
         build_nav()
     except Exception:
@@ -145,7 +147,6 @@ def ui_project(
 # ---- Brief & Choices -------------------------------------------------------
 @router.post("/ui/{slug}/brief")
 def save_brief(slug: str, brief_text: str = Form(...)):
-    # Validate JSON; if invalid, just bounce back to the section
     try:
         json.loads(brief_text)
     except json.JSONDecodeError:
@@ -179,28 +180,20 @@ def save_choices(
     manifest_path.write_text("choices:\n" + "".join(f"  - {c}\n" for c in picked), encoding="utf-8")
     return RedirectResponse(url=f"/ui/{slug}?choices=ok#choices", status_code=303)
 
-# ---- Generate (GET & POST; never 500 to user) ------------------------------
+# ---- Generate (GET & POST) -------------------------------------------------
 @router.api_route("/ui/{slug}/generate", methods=["GET", "POST"])
 def generate(slug: str, refine: Optional[str] = Form(None)):
-    """
-    If GET: trigger generation with current brief/choices (no form needed).
-    If POST: same behavior (e.g., from a form submit).
-    Always redirect back to /ui/{slug} with ?gen=ok or ?generr=1.
-    """
     docs_dir = Path("docs") / "projects" / slug
 
-    # Read brief (default to {})
     brief_text = "{}"
     p = docs_dir / "brief.json"
     if p.exists():
         try:
             brief_text = p.read_text(encoding="utf-8")
-            # Ensure valid JSON to avoid downstream crashes
             json.loads(brief_text)
         except Exception:
             return RedirectResponse(url=f"/ui/{slug}?generr=1#generate", status_code=303)
 
-    # Read choices
     choices: List[str] = []
     man = docs_dir / "manifest.yaml"
     if man.exists():
@@ -212,7 +205,6 @@ def generate(slug: str, refine: Optional[str] = Form(None)):
         except Exception:
             pass
 
-    # Ensure diagrams/ exists so Docs isn’t empty
     diag_dir = docs_dir / "diagrams"
     diag_dir.mkdir(parents=True, exist_ok=True)
     if not (diag_dir / "index.md").exists():
@@ -222,12 +214,10 @@ def generate(slug: str, refine: Optional[str] = Form(None)):
             encoding="utf-8",
         )
 
-    # Get project_name
     with get_session() as session:
         proj: Optional[Project] = session.query(Project).filter(Project.slug == slug).first()
     project_name = proj.name if proj else slug.replace("-", " ").title()
 
-    # Run generation best-effort; never throw to user
     try:
         generate_all(
             project_slug=slug,
@@ -236,36 +226,49 @@ def generate(slug: str, refine: Optional[str] = Form(None)):
             choices=choices,
             refine=bool(refine),
         )
-        # Refresh nav after generation (best-effort)
         try:
             build_nav()
         except Exception:
             pass
         return RedirectResponse(url=f"/ui/{slug}?gen=ok#generate", status_code=303)
     except Exception:
-        # Don’t surface 500—send the user back with a toast
         return RedirectResponse(url=f"/ui/{slug}?generr=1#generate", status_code=303)
 
+# ---- API: list/create/delete projects -------------------------------------
 @router.get("/api/projects")
 def api_list_projects():
-    """
-    Return all projects for the Projects list on the home page.
-    Anyone can view; returns name, slug, and created_at (ISO).
-    """
     with get_session() as session:
         rows = session.exec(select(Project).order_by(Project.created_at.desc())).all()
-    # FastAPI will serialize datetimes to ISO 8601 automatically
-    return [
-        {"name": p.name, "slug": p.slug, "created_at": p.created_at}
-        for p in rows
-    ]
+    return [{"name": p.name, "slug": p.slug, "created_at": p.created_at} for p in rows]
+
+@router.post("/api/projects")
+def api_create_project(payload: dict):
+    # Accepts JSON with optional slug/nav_title; mirrors /ui/create behavior
+    name = (payload.get("name") or "").strip()
+    slug = (payload.get("slug") or "").strip() or None
+    nav_title = (payload.get("nav_title") or "").strip() or None
+    if not name:
+        raise HTTPException(status_code=400, detail="name is required")
+    return _create_project_and_scaffold(name=name, slug=slug, nav_title=nav_title)
 
 @router.delete("/api/projects/{slug}")
 def api_delete_project(slug: str):
+    # Remove DB row and generated docs folder for the slug
     with get_session() as session:
         proj: Optional[Project] = session.query(Project).filter(Project.slug == slug).first()
         if not proj:
             raise HTTPException(status_code=404, detail="Project not found")
         session.delete(proj)
         session.commit()
+
+    # Best-effort: remove docs/projects/<slug>
+    proj_dir = Path("docs") / "projects" / slug
+    if proj_dir.exists():
+        shutil.rmtree(proj_dir, ignore_errors=True)
+        # Refresh nav after deletion
+        try:
+            build_nav()
+        except Exception:
+            pass
+
     return {"ok": True}
