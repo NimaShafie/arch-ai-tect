@@ -17,11 +17,11 @@
       --ring: rgba(37, 99, 235, .25);
       --shadow: 0 10px 20px rgba(2,6,23,.06), 0 2px 6px rgba(2,6,23,.08);
 
-      --btn-h: 42px;               /* unified button height */
+      --btn-h: 42px;
       --btn-pad-x: 14px;
       --radius: 14px;
 
-      --toast-size: 1.2rem;        /* 20% larger vs default ~1rem */
+      --toast-size: 1.2rem;
     }
 
     *{ box-sizing:border-box }
@@ -55,7 +55,6 @@
       border:1px solid #e9e5ff;
     }
 
-    /* Unified button styling */
     .btn{
       appearance:none; border:1px solid var(--border); background:var(--card);
       height:var(--btn-h);
@@ -87,13 +86,12 @@
 
     .field{ display:flex; flex-direction:column; gap:6px; margin-bottom:14px }
 
-    /* JSON-friendly textarea */
     .json-textarea{
       width:100%;
       padding:12px 12px;
       border:1px solid var(--border);
       border-radius:12px;
-      background:#0b1020;            /* dark-ish to hint code */
+      background:#0b1020;
       color:#e6edf3;
       font: 14px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
       min-height: 240px;
@@ -101,7 +99,6 @@
     }
     .json-textarea:focus{ outline:none; box-shadow:0 0 0 4px var(--ring); border-color:transparent }
 
-    /* Toasts: top-right, larger */
     .toast-wrap{
       position:fixed; right:16px; top:16px; z-index:9999;
       display:flex; flex-direction:column; gap:10px; pointer-events:none;
@@ -118,10 +115,9 @@
       opacity:0; transform: translateY(-6px); transition: all .18s ease;
     }
     .toast.show{ opacity:1; transform: translateY(0) }
-    .toast.success{ background:#065f46 }  /* teal-700 */
-    .toast.error{ background:#7f1d1d }    /* red-900 */
+    .toast.success{ background:#065f46 }
+    .toast.error{ background:#7f1d1d }
 
-    /* Padding fix for headings directly in .card */
     .card > h1, .card > h2, .card > h3{
       margin:0; padding:18px 20px; border-bottom:1px solid var(--border);
       border-top-left-radius:16px; border-top-right-radius:16px;
@@ -130,6 +126,15 @@
       padding-top:16px; padding-left:20px; padding-right:20px;
     }
     .card > :not(.hd):last-child{ padding-bottom:20px }
+
+    /* Extra spacing for form rows (labels vs inputs) */
+    .form-row{ display:flex; flex-direction:column; gap:10px; margin:14px 0; }
+    .input{
+      width:100%; padding:14px 16px; border:1px solid var(--border);
+      border-radius:12px;
+      background:#fff; color:#0f172a;
+      font-size:16px;
+    }
 
     @media (max-width:980px){
       .grid{ grid-template-columns:1fr }
@@ -140,7 +145,6 @@
   <link rel="alternate icon" href="/assets/favicon.svg">
 
   <script>
-    // Lightweight toast helper (top-right)
     function showToast(msg, type='success', timeout=2600){
       const wrap = document.querySelector('.toast-wrap') || (()=>{
         const w = document.createElement('div'); w.className='toast-wrap'; document.body.appendChild(w); return w;
@@ -164,19 +168,17 @@
     <nav class="nav">
       <div class="brand">ArchAiTect Workbench</div>
       <div class="nav-links">
-        <a class="pill" href="/ui">New Project</a>
-        <a class="pill" href="/ui/projects">My Projects</a>
-        <a class="pill" href="">Docs</a>
-        <a class="pill" href="/docs">Swagger</a>
-        <a class="pill" href="" target="_blank" rel="noopener">OpenWebUI</a>
-        <a class="btn" href="#account-module" title="Account">Account</a>
+        <!-- Removed "New Project"; all remaining open in new tabs -->
+        <a class="pill" href="https://workbench.shafie.org/" rel="noopener">Workbench</a>
+        <a class="pill" href="https://docs.shafie.org/" target="_blank" rel="noopener">Docs</a>
+        <a class="pill" href="/docs" target="_blank" rel="noopener">Swagger</a>
+        <a class="pill" href="https://ai.shafie.org/" target="_blank" rel="noopener">Open WebUI</a>
       </div>
     </nav>
 
     {% block content %}{% endblock %}
   </div>
 
-  <!-- Toast host -->
   <div class="toast-wrap" aria-live="polite"></div>
 
   {% block scripts %}{% endblock %}
