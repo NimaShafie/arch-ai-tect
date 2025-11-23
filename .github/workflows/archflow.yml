@@ -1,7 +1,6 @@
 name: ArchAiTect Pipeline
 
 on:
-  # 1) Use this to scaffold + auto-generate and open a PR for review
   workflow_dispatch:
     inputs:
       title:   { description: "Title (e.g., Payments Architecture)", required: true }
@@ -9,7 +8,6 @@ on:
       owner:   { description: "Owner (e.g., Platform Team)", required: false, default: "Unassigned" }
       backend: { description: "openwebui | ollama | auto", required: false, default: "auto" }
 
-  # 2) After PR is merged, these paths trigger the downstream jobs
   push:
     paths:
       - "packages/**"
@@ -25,14 +23,10 @@ permissions:
   pull-requests: write
 
 env:
-  # prefer repo Variables for non-secret knobs
-  ARCHAI_MODEL: ${{ vars.ARCHAI_MODEL }} # e.g., qwen2.5:3b
+  ARCHAI_MODEL: ${{ vars.ARCHAI_MODEL }}
   KROKI_URL: https://kroki.io
 
 jobs:
-  #######################################################################
-  # A. PR CREATION PATH (manual trigger) — stops after opening the PR
-  #######################################################################
   scaffold_and_generate:
     if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
@@ -49,16 +43,17 @@ jobs:
           set -e
           TITLE="${{ inputs.title }}"
           OWNER="${{ inputs.owner }}"
-          # Use provided slug, else slugify title
           if [ -n "${{ inputs.slug }}" ]; then
             PACKAGE_ID="${{ inputs.slug }}"
           else
             PACKAGE_ID="$(./scripts/slugify.sh "$TITLE")"
           fi
-          echo "title=$TITLE"       >> $GITHUB_OUTPUT
-          echo "owner=$OWNER"       >> $GITHUB_OUTPUT
-          echo "package_id=$PACKAGE_ID" >> $GITHUB_OUTPUT
-          echo "branch=archaitect/${PACKAGE_ID}/${{ github.run_id }}" >> $GITHUB_OUTPUT
+          {
+            echo "title=$TITLE"
+            echo "owner=$OWNER"
+            echo "package_id=$PACKAGE_ID"
+            echo "branch=archaitect/${PACKAGE_ID}/${{ github.run_id }}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Scaffold package from template (no push)
         shell: bash
@@ -71,24 +66,29 @@ jobs:
           if [ ! -d "packages/$PID" ]; then
             mkdir -p "packages/$PID"
             rsync -a templates/_arch/ "packages/$PID/"
-            # token replacement
             find "packages/$PID" -type f -print0 | xargs -0 sed -i \
               -e "s/{{TITLE}}/$TITLE/g" \
               -e "s/{{OWNER}}/$OWNER/g" \
               -e "s/{{PACKAGE_ID}}/$PID/g"
-            # docs page from template
             sed -e "s/{{TITLE}}/$TITLE/g" -e "s/{{OWNER}}/$OWNER/g" -e "s/{{PACKAGE_ID}}/$PID/g" \
               docs/packages/__template__.md > "docs/packages/$PID.md"
           fi
 
-      - name: Update catalog (YAML-safe; avoids heredoc parsing issues)
+      - name: Update catalog (YAML-safe)
         shell: bash
         run: |
-          python3 -c "import pathlib; \
-from pathlib import Path; \
-root=Path('packages'); \
-items=sorted([p.name for p in root.iterdir() if p.is_dir()]); \
-Path('docs/catalog.md').write_text('# Architecture Catalog\\n\\n' + '\\n'.join(f'- [{s}](packages/{s}.md)' for s in items) + '\\n', encoding='utf-8')"
+          set -e
+          cat > _update_catalog.py <<'PY'
+import pathlib
+root = pathlib.Path("packages")
+items = sorted([p.name for p in root.iterdir() if p.is_dir()])
+out = ["# Architecture Catalog", ""]
+for s in items:
+    out.append(f"- [{s}](packages/{s}.md)")
+pathlib.Path("docs/catalog.md").write_text("\n".join(out) + "\n", encoding="utf-8")
+PY
+          python3 _update_catalog.py
+          rm -f _update_catalog.py
 
       - name: Validate intake is edited (fail fast if still template)
         shell: bash
@@ -141,9 +141,6 @@ Path('docs/catalog.md').write_text('# Architecture Catalog\\n\\n' + '\\n'.join(f
             docs/catalog.md
           delete-branch: true
 
-  #######################################################################
-  # B. POST-MERGE PIPELINE (push to default branch)
-  #######################################################################
   export_structurizr:
     if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-latest
@@ -166,7 +163,9 @@ Path('docs/catalog.md').write_text('# Architecture Catalog\\n\\n' + '\\n'.join(f
           done
           [ "$found" = "0" ] && echo "No DSL files found, skipping."
       - uses: actions/upload-artifact@v4
-        with: { name: exported, path: packages/**/diagrams/*/* }
+        with:
+          name: exported
+          path: packages/**/diagrams/*/*
 
   render_kroki:
     if: ${{ github.event_name == 'push' }}
@@ -191,7 +190,9 @@ Path('docs/catalog.md').write_text('# Architecture Catalog\\n\\n' + '\\n'.join(f
             curl -s -X POST -H "Content-Type: text/plain" --data-binary @"$f" "$KROKI/mermaid/svg" > "$out"
           done
       - uses: actions/upload-artifact@v4
-        with: { name: diagrams-svg, path: packages/**/diagrams/svg/*.svg }
+        with:
+          name: diagrams-svg
+          path: packages/**/diagrams/svg/*.svg
 
   build_docs:
     if: ${{ github.event_name == 'push' }}
@@ -200,12 +201,14 @@ Path('docs/catalog.md').write_text('# Architecture Catalog\\n\\n' + '\\n'.join(f
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.12" }
+        with:
+          python-version: "3.12"
       - run: python -m pip install mkdocs mkdocs-material mkdocs-macros-plugin
       - name: Build site
         run: mkdocs build --strict
       - uses: actions/upload-pages-artifact@v3
-        with: { path: site }
+        with:
+          path: site
 
   publish_docs:
     if: ${{ github.event_name == 'push' }}
@@ -242,7 +245,8 @@ Path('docs/catalog.md').write_text('# Architecture Catalog\\n\\n' + '\\n'.join(f
       - uses: actions/checkout@v4
       - name: Install Node
         uses: actions/setup-node@v4
-        with: { node-version: 20 }
+        with:
+          node-version: 20
       - name: Install Notion SDK
         run: npm -y add @notionhq/client
       - name: Create Notion tasks
