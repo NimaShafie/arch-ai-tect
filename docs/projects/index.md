@@ -1,3 +1,11 @@
-# TEMP NUKE TEST
+# Projects
 
-Deployed at Mon Nov 24 03:18:30 AM UTC 2025
+<div id="wb-projects">
+  <em>Loading Projects…</em>
+</div>
+
+<script>
+  // Set at build time via mkdocs-material macros, GitHub Actions env, or left unset to use default
+  window.__WB_CFG = window.__WB_CFG || {};
+  // Example: window.__WB_CFG.API_BASE = "{{ extra.endpoints.workbench | default('https://workbench.shafie.org') }}";
+</script>

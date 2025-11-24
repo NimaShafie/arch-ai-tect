@@ -50,6 +50,8 @@ extra_javascript:
 
 extra:
   endpoints:
+    # You can set these in GH Actions with a yq replace or leave as docs-only hints.
     openwebui: https://ai.shafie.org/
     kroki: https://kroki.shafie.org/
     plantuml: https://uml.shafie.org/
+    # workbench: https://workbench.shafie.org
