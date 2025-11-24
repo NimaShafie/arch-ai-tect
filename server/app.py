@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.middleware.cors import CORSMiddleware  # <-- add
+from fastapi.middleware.cors import CORSMiddleware
 
 from .routers.ui import router as ui_router
 from .db import init_db
@@ -14,9 +14,9 @@ app = FastAPI(title="Architecture Workbench Registry")
 # --- CORS so docs.shafie.org can fetch /api/projects, etc. ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://docs.shafie.org"],
+    allow_origins=["*"],
     allow_credentials=False,
-    allow_methods=["GET", "OPTIONS", "DELETE", "POST"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 # --------------------------------------------------------------

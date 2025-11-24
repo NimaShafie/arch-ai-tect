@@ -1,56 +1,49 @@
 # Projects
 
-<div id="projects-root" aria-live="polite">
-  <p class="muted">Loading projects from Workbench…</p>
-</div>
+> This page auto-loads the current projects from **Workbench**.  
+> If JavaScript is disabled, you’ll see whatever was last published.
 
-<!-- Live list from Workbench: shows newest first, falls back if API unavailable -->
+<ul id="projects-list">
+  <!-- Fallback content (kept for SEO and offline) -->
+  <!-- The build step will overwrite this with the latest list.
+       Then the script below will refresh it live at runtime. -->
+  <li><a href="../projects/">(loading…)</a></li>
+</ul>
+
 <script>
-(function() {
-  const API = 'https://workbench.shafie.org/api/projects';
-  const root = document.getElementById('projects-root');
-
-  function render(items) {
-    if (!items || !items.length) {
-      root.innerHTML = '<p class="muted">No projects yet.</p>';
+(async () => {
+  const list = document.getElementById('projects-list');
+  function render(items){
+    list.innerHTML = '';
+    if (!items.length){
+      list.innerHTML = '<li><em>No projects yet.</em></li>';
       return;
     }
-    // newest first (created_at desc), fallback by slug
-    items.sort((a,b) => {
-      const aa = (a.created_at || '') + (a.slug || '');
-      const bb = (b.created_at || '') + (b.slug || '');
-      return aa < bb ? 1 : aa > bb ? -1 : 0;
-    });
-
-    const ul = document.createElement('ul');
-    ul.style.listStyle = 'disc';
-    ul.style.paddingLeft = '1.25rem';
-
-    for (const p of items) {
+    for (const p of items){
       const name = (p.name || p.slug || '').trim();
-      const slug = (p.slug || '').trim();
-      if (!slug) continue;
-
+      const slug = p.slug || '';
+      if (!name) continue;
       const li = document.createElement('li');
-      const a = document.createElement('a');
-      a.textContent = name || slug;
-      a.href = `/projects/${encodeURIComponent(slug)}/`;
+      const a  = document.createElement('a');
+      a.textContent = name;
+      a.href = slug ? `../${slug}/` : '#';
       li.appendChild(a);
-      ul.appendChild(li);
+      list.appendChild(li);
     }
-    root.innerHTML = '';
-    root.appendChild(ul);
   }
 
-  fetch(API + '?t=' + Date.now(), { method: 'GET', mode: 'cors' })
-    .then(r => {
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.json();
-    })
-    .then(render)
-    .catch(err => {
-      console.warn('Workbench projects fetch failed:', err);
-      root.innerHTML = '<p class="muted">Could not load projects from Workbench right now.</p>';
-    });
+  try {
+    // Always fetch fresh from Workbench (bypass intermediary caches)
+    const url = `https://workbench.shafie.org/api/projects?t=${Date.now()}`;
+    const res = await fetch(url, { cache: 'no-store', mode: 'cors' });
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    const items = await res.json();
+    // newest first if created_at exists
+    items.sort((a,b) => String(b.created_at||'').localeCompare(String(a.created_at||'')));
+    render(items);
+  } catch (e) {
+    // On any error, keep whatever was baked at build time
+    console.warn('Live projects fetch failed:', e);
+  }
 })();
 </script>

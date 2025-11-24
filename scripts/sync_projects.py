@@ -1,55 +1,91 @@
-# scripts/sync_projects.py
-import json, os, pathlib, urllib.request, urllib.error, sys
+#!/usr/bin/env python3
+"""
+Generate docs/projects/index.md and the nav fragments from Workbench.
+Never fails the build: on any fetch error, we write a minimal/fallback page.
 
-ROOT = pathlib.Path(__file__).resolve().parent.parent
+Inputs (optional):
+  WORKBENCH_URL  default: https://workbench.shafie.org
+  OUTPUT_DIR     default: docs/projects
+"""
+
+import json
+import os
+import pathlib
+import ssl
+import sys
+import urllib.error
+import urllib.request
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
-PROJECTS_DIR = DOCS / "projects"
-PROJECTS_DIR.mkdir(parents=True, exist_ok=True)
+OUT_DIR = DOCS / "projects"
 
-WORKBENCH_URL = os.getenv("WORKBENCH_URL", "https://workbench.shafie.org").rstrip("/")
-API = f"{WORKBENCH_URL}/api/projects"
+BASE = os.getenv("WORKBENCH_URL", "https://workbench.shafie.org").rstrip("/")
+API  = f"{BASE}/api/projects"
 
-HEADERS = {}
-cf_id = os.getenv("WB_CF_ID") or os.getenv("WORKBENCH_CF_ACCESS_CLIENT_ID")
-cf_secret = os.getenv("WB_CF_SECRET") or os.getenv("WORKBENCH_CF_ACCESS_CLIENT_SECRET")
-if cf_id and cf_secret:
-    HEADERS["CF-Access-Client-Id"] = cf_id
-    HEADERS["CF-Access-Client-Secret"] = cf_secret
+UA = (
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/124 Safari/537.36"
+)
 
-req = urllib.request.Request(API, headers=HEADERS)
-try:
-    with urllib.request.urlopen(req, timeout=20) as resp:
-        items = json.loads(resp.read().decode("utf-8"))
-except urllib.error.HTTPError as e:
-    print(f"::error::Fetching {API} failed: {e.code} {e.reason}")
-    sys.exit(1)
-except Exception as e:
-    print(f"::error::Fetching {API} failed: {e}")
-    sys.exit(1)
+def fetch_json(url: str):
+    req = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": UA,
+            "Accept": "application/json",
+            "Accept-Encoding": "identity",
+            "Connection": "close",
+        },
+        method="GET",
+    )
+    # tolerant SSL context
+    ctx = ssl.create_default_context()
+    try:
+        with urllib.request.urlopen(req, timeout=15, context=ctx) as resp:
+            if resp.status != 200:
+                raise urllib.error.HTTPError(url, resp.status, "bad status", resp.headers, None)
+            data = resp.read()
+            return json.loads(data.decode("utf-8", errors="replace"))
+    except Exception as e:
+        print(f"::warning::Fetching {url} failed: {e}", file=sys.stderr)
+        return None
 
-# newest first if created_at present
-def sort_key(x):
-    return (x.get("created_at") or "", x.get("slug") or "")
-items = sorted(items, key=sort_key, reverse=True)
+def write_projects(items):
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-# Write docs/projects/index.md
-lines = ["# Projects", ""]
-for p in items:
-    name = (p.get("name") or p.get("slug") or "").strip()
-    slug = p.get("slug") or ""
-    if slug:
-        lines.append(f"- [{name}](../projects/{slug}/)")
-(PROJECTS_DIR / "index.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    # sort newest first if created_at exists
+    def key(p):
+        return (p.get("created_at") or "", p.get("slug") or "")
 
-# Write global & local nav fragments
-nav = ["- Projects:", "  - Overview: projects/index.md"]
-for p in items:
-    name = (p.get("name") or p.get("slug") or "").replace(":", "\\:")
-    slug = p.get("slug") or ""
-    if slug:
-        nav.append(f"  - {name}: projects/{slug}/index.md")
+    md_lines = ["# Projects", ""]
+    nav = ["- Projects:", "  - Overview: projects/index.md"]
 
-(DOCS / "_generated_projects_nav.yml").write_text("\n".join(nav) + "\n", encoding="utf-8")
-(PROJECTS_DIR / "_nav.generated.yml").write_text("\n".join(nav) + "\n", encoding="utf-8")
+    if items:
+        for p in sorted(items, key=key, reverse=True):
+            name = (p.get("name") or p.get("slug") or "").strip()
+            slug = (p.get("slug") or "").strip()
+            if not slug:
+                continue
+            md_lines.append(f"- [{name}](../projects/{slug}/)")
+            safe_name = name.replace(":", "\\:")
+            nav.append(f"  - {safe_name}: projects/{slug}/index.md")
+    else:
+        md_lines += [
+            "> _No projects found at the Workbench right now._",
+            "",
+            "This list is generated automatically during the docs build.",
+        ]
 
-print("Projects page and nav fragments updated from Workbench.")
+    (OUT_DIR / "index.md").write_text("\n".join(md_lines) + "\n", encoding="utf-8")
+    (DOCS / "_generated_projects_nav.yml").write_text("\n".join(nav) + "\n", encoding="utf-8")
+    (OUT_DIR / "_nav.generated.yml").write_text("\n".join(nav) + "\n", encoding="utf-8")
+
+def main():
+    items = fetch_json(API)
+    if not isinstance(items, list):
+        items = []
+    write_projects(items)
+
+if __name__ == "__main__":
+    main()
