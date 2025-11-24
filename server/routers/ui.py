@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import shutil
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -23,7 +22,6 @@ templates = Jinja2Templates(directory="server/templates")
 DOCS_BASE = "https://docs.shafie.org"
 UI_BASE = "https://workbench.shafie.org"
 
-
 def _docs_urls(slug: str) -> Dict[str, str]:
     base = f"{DOCS_BASE}/projects/{slug}"
     return {
@@ -35,19 +33,23 @@ def _docs_urls(slug: str) -> Dict[str, str]:
         "diagrams": base + "/diagrams/",
     }
 
-
 @router.get("/", include_in_schema=False)
 def ui_root():
     return RedirectResponse(url="/ui", status_code=303)
 
-
 @router.get("/ui", response_class=HTMLResponse, include_in_schema=False)
 @router.get("/ui/", response_class=HTMLResponse, include_in_schema=False)
 def ui_index(request: Request):
-    return templates.TemplateResponse("ui_home.html", {"request": request})
+    # home page template that lists projects and create form
+    # (kept the same filename to preserve styling)
+    with get_session() as session:
+        rows = session.exec(select(Project).order_by(Project.created_at.desc())).all()
+    return templates.TemplateResponse(
+        "ui.html",
+        {"request": request, "projects": rows},
+    )
 
-
-# ---- Create project via form (compat) --------------------------------------
+# ---- Create project (GET & POST) -------------------------------------------
 @router.api_route("/ui/create", methods=["GET", "POST"], include_in_schema=False)
 def ui_create(
     request: Request,
@@ -58,23 +60,6 @@ def ui_create(
     if request.method != "POST":
         return RedirectResponse(url="/ui", status_code=303)
 
-    return _create_project(name=name, slug=slug, nav_title=nav_title)
-
-
-# ---- Create project via JSON API (used by UI JS) ---------------------------
-@router.post("/api/projects")
-def api_create_project(payload: Dict[str, Optional[str]]):
-    name = (payload.get("name") or "").strip()
-    slug = (payload.get("slug") or "").strip() or None
-    nav_title = (payload.get("nav_title") or "").strip() or None
-    _create_project(name=name, slug=slug, nav_title=nav_title)
-    # return latest list
-    with get_session() as session:
-        rows = session.exec(select(Project).order_by(Project.created_at.desc())).all()
-    return [{"name": p.name, "slug": p.slug, "created_at": p.created_at} for p in rows]
-
-
-def _create_project(*, name: Optional[str], slug: Optional[str], nav_title: Optional[str]):
     final_slug = slugify((slug or name or "")).strip("-")
     if not final_slug:
         return RedirectResponse(url="/ui", status_code=303)
@@ -90,36 +75,24 @@ def _create_project(*, name: Optional[str], slug: Optional[str], nav_title: Opti
             session.add(proj)
             session.commit()
 
-    # Scaffold docs tree
+    # soft-scaffold docs path so users see a placeholder
     proj_dir = Path("docs") / "projects" / final_slug
     proj_dir.mkdir(parents=True, exist_ok=True)
     idx = proj_dir / "index.md"
     if not idx.exists():
         idx.write_text(
             f"# {final_title}\n\nThis space is scaffolded and ready.\n\n"
-            "## Next steps (in the Workbench UI)\n"
-            f"1. Fill the high-level brief → {UI_BASE}/ui/{final_slug}#brief\n"
-            f"2. Choose diagram types → {UI_BASE}/ui/{final_slug}#choices\n"
-            f"3. Generate artifacts → {UI_BASE}/ui/{final_slug}#generate\n\n"
-            "Once generated, diagrams and specifications will appear here under this project.\n",
+            "Use **Workbench → Generate** to populate artifacts and diagrams.",
             encoding="utf-8",
         )
-    # ensure diagrams index exists
-    diag_dir = proj_dir / "diagrams"
-    diag_dir.mkdir(parents=True, exist_ok=True)
-    if not (diag_dir / "index.md").exists():
-        (diag_dir / "index.md").write_text(
-            "# Diagrams\n\nThis section will list generated diagrams. Use **Generate Diagrams** in the Workbench.\n",
-            encoding="utf-8",
-        )
+    (proj_dir / "diagrams").mkdir(parents=True, exist_ok=True)
 
     try:
-        build_nav()  # best-effort
+        build_nav()
     except Exception:
         pass
 
     return RedirectResponse(url=f"/ui/{final_slug}", status_code=303)
-
 
 # ---- Project page ----------------------------------------------------------
 @router.get("/ui/{slug}", response_class=HTMLResponse)
@@ -162,7 +135,6 @@ def ui_project(
         },
     )
 
-
 # ---- Brief & Choices -------------------------------------------------------
 @router.post("/ui/{slug}/brief")
 def save_brief(slug: str, brief_text: str = Form(...)):
@@ -175,7 +147,6 @@ def save_brief(slug: str, brief_text: str = Form(...)):
     proj_dir.mkdir(parents=True, exist_ok=True)
     (proj_dir / "brief.json").write_text(brief_text, encoding="utf-8")
     return RedirectResponse(url=f"/ui/{slug}?brief=ok#brief", status_code=303)
-
 
 @router.post("/ui/{slug}/choices")
 def save_choices(
@@ -199,7 +170,6 @@ def save_choices(
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text("choices:\n" + "".join(f"  - {c}\n" for c in picked), encoding="utf-8")
     return RedirectResponse(url=f"/ui/{slug}?choices=ok#choices", status_code=303)
-
 
 # ---- Generate (GET & POST) -------------------------------------------------
 @router.api_route("/ui/{slug}/generate", methods=["GET", "POST"])
@@ -226,11 +196,10 @@ def generate(slug: str, refine: Optional[str] = Form(None)):
         except Exception:
             pass
 
-    diag_dir = docs_dir / "diagrams"
-    diag_dir.mkdir(parents=True, exist_ok=True)
-    if not (diag_dir / "index.md").exists():
-        (diag_dir / "index.md").write_text(
-            "# Diagrams\n\nWhen you generate, diagrams will appear here as SVGs and will be linked from the navigation.\n",
+    (docs_dir / "diagrams").mkdir(parents=True, exist_ok=True)
+    if not (docs_dir / "diagrams" / "index.md").exists():
+        (docs_dir / "diagrams" / "index.md").write_text(
+            "# Diagrams\n\nGenerated diagrams will appear here.\n",
             encoding="utf-8",
         )
 
@@ -254,18 +223,24 @@ def generate(slug: str, refine: Optional[str] = Form(None)):
     except Exception:
         return RedirectResponse(url=f"/ui/{slug}?generr=1#generate", status_code=303)
 
-
-# ---- API: list/delete projects --------------------------------------------
+# ---- API: list/create/delete projects -------------------------------------
 @router.get("/api/projects")
 def api_list_projects():
     with get_session() as session:
         rows = session.exec(select(Project).order_by(Project.created_at.desc())).all()
     return [{"name": p.name, "slug": p.slug, "created_at": p.created_at} for p in rows]
 
+@router.post("/api/projects")
+def api_create_project(payload: dict):
+    name = (payload or {}).get("name") or ""
+    slug = (payload or {}).get("slug")
+    nav_title = (payload or {}).get("nav_title")
+    request = Request  # not used; keep consistent signature with form version
+    return ui_create(request, name=name, slug=slug, nav_title=nav_title)
 
 @router.delete("/api/projects/{slug}")
 def api_delete_project(slug: str):
-    # delete DB row
+    # 1) delete from DB
     with get_session() as session:
         proj: Optional[Project] = session.query(Project).filter(Project.slug == slug).first()
         if not proj:
@@ -273,11 +248,21 @@ def api_delete_project(slug: str):
         session.delete(proj)
         session.commit()
 
-    # best-effort: remove local docs tree so the next push/build reflects deletion
+    # 2) remove docs directory (safe)
     proj_dir = Path("docs") / "projects" / slug
-    if proj_dir.exists():
-        shutil.rmtree(proj_dir, ignore_errors=True)
+    if proj_dir.exists() and proj_dir.is_dir():
+        # remove contents recursively
+        for p in sorted(proj_dir.rglob("*"), reverse=True):
+            try:
+                p.unlink() if p.is_file() else p.rmdir()
+            except Exception:
+                pass
+        try:
+            proj_dir.rmdir()
+        except Exception:
+            pass
 
+    # 3) rebuild nav (best-effort)
     try:
         build_nav()
     except Exception:

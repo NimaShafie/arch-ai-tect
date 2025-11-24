@@ -204,55 +204,15 @@ PY
 
       - run: python -m pip install mkdocs mkdocs-material mkdocs-macros-plugin
 
-      # >>> NEW: fetch projects from Workbench, generate Projects page & nav
+      # --- Sync projects page from Workbench (with CF Access headers if set) ---
       - name: Sync projects page from Workbench
         env:
           WORKBENCH_URL: ${{ vars.WORKBENCH_URL }}
+          WB_CF_ID:      ${{ secrets.WB_CF_ID }}
+          WB_CF_SECRET:  ${{ secrets.WB_CF_SECRET }}
         run: |
-          python - <<'PY'
-import json, os, pathlib, urllib.request
-root = pathlib.Path("docs")
-projects_dir = root / "projects"
-projects_dir.mkdir(parents=True, exist_ok=True)
-
-base = os.getenv("WORKBENCH_URL") or "https://workbench.shafie.org"
-url  = base.rstrip("/") + "/api/projects"
-
-try:
-    with urllib.request.urlopen(url, timeout=12) as r:
-        items = json.load(r)
-except Exception as e:
-    print(f"::warning::Could not fetch {url}: {e}")
-    # Do not fail the build; keep existing index.md
-    raise SystemExit(0)
-
-# Sort newest first if created_at present
-def k(x): return (x.get("created_at") or "", x.get("slug") or "")
-items = sorted(items, key=k, reverse=True)
-
-# Write docs/projects/index.md
-lines = ["# Projects", ""]
-for p in items:
-    name = p.get("name","").strip() or p.get("slug","")
-    slug = p.get("slug","")
-    if slug:
-        lines.append(f"- [{name}](../projects/{slug}/)")
-index_md = "\n".join(lines) + "\n"
-(projects_dir / "index.md").write_text(index_md, encoding="utf-8")
-
-# Global nav fragment (if included by mkdocs.yml)
-nav = ["- Projects:", "  - Overview: projects/index.md"]
-for p in items:
-    name = p.get("name","").replace(":", "\\:")
-    slug = p.get("slug","")
-    if slug:
-        nav.append(f"  - {name}: projects/{slug}/index.md")
-(root / "_generated_projects_nav.yml").write_text("\n".join(nav) + "\n", encoding="utf-8")
-
-# Local nav fragment (for per-section includes)
-(projects_dir / "_nav.generated.yml").write_text("\n".join(nav) + "\n", encoding="utf-8")
-PY
-      # <<< NEW
+          set -e
+          python scripts/sync_projects.py
 
       - name: Build site
         run: mkdocs build --strict
@@ -267,6 +227,20 @@ PY
     runs-on: ubuntu-latest
     steps:
       - uses: actions/deploy-pages@v4
+
+      # --- Purge Cloudflare cache for docs.shafie.org/projects/ (optional) ---
+      - name: Purge Cloudflare cache (docs.shafie.org/projects/)
+        if: ${{ secrets.CF_ZONE_ID && secrets.CF_API_TOKEN }}
+        env:
+          CF_ZONE_ID:   ${{ secrets.CF_ZONE_ID }}
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+        run: |
+          set -e
+          curl -sS -X POST "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/purge_cache" \
+            -H "Authorization: Bearer ${CF_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data '{"files":["https://docs.shafie.org/projects/","https://docs.shafie.org/projects/index.html"]}'
+          echo "Cloudflare purge requested."
 
   jira_handoff:
     if: ${{ github.event_name == 'push' }}

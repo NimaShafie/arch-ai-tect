@@ -11,17 +11,17 @@
 
     <form id="createForm" autocomplete="off" style="margin-top:12px;">
       <div class="form-row">
-        <label for="name" style="margin-bottom:6px;display:block;">Project Name</label>
+        <label for="name">Project Name</label>
         <input id="name" name="name" class="input" type="text" placeholder="e.g., Disney+Ai+" required />
       </div>
 
       <div class="form-row">
-        <label for="slug" style="margin-bottom:6px;display:block;">Slug <span class="muted">(optional)</span></label>
+        <label for="slug">Slug <span class="muted">(optional)</span></label>
         <input id="slug" name="slug" class="input" type="text" placeholder="auto-from-name" />
       </div>
 
       <div class="form-row">
-        <label for="nav_title" style="margin-bottom:6px;display:block;">Nav Title <span class="muted">(optional)</span></label>
+        <label for="nav_title">Nav Title <span class="muted">(optional)</span></label>
         <input id="nav_title" name="nav_title" class="input" type="text" placeholder="defaults to name" />
       </div>
 
@@ -48,6 +48,9 @@
       </div>
       {% endfor %}
     </div>
+    <p class="muted" style="margin-top:10px">
+      Deleting here also removes <code>docs/projects/&lt;slug&gt;</code> so MkDocs stays clean.
+    </p>
   </section>
 {% endblock %}
 
@@ -55,7 +58,7 @@
 
 {% block scripts %}
 <script>
-  // Create (POST /api/projects)
+  // Create
   document.querySelector('#createForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const data = {
@@ -76,12 +79,12 @@
     location.reload();
   });
 
-  // Delete (DELETE /api/projects/{slug}) with confirm, remove row on success
+  // Delete (with confirm)
   document.querySelector('#projects').addEventListener('click', async (e) => {
     const btn = e.target.closest('[data-delete]');
     if (!btn) return;
     const slug = btn.getAttribute('data-delete');
-    if (!confirm(`Delete project "${slug}" and its generated files?`)) return;
+    if (!confirm(`Delete project "${slug}" and its generated files in docs?`)) return;
 
     const r = await fetch(`/api/projects/${encodeURIComponent(slug)}`, { method:'DELETE' });
     if (!r.ok) {
