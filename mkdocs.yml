@@ -38,12 +38,15 @@ plugins:
   - kroki:
   - exclude:
       glob:
-        - "package/**"                     # drafts with unresolved links
-        - "architecture/**"                # hide if you don’t want them yet
+        - "package/**"
+        - "architecture/**"
         - "catalog.md"
         - "services.md"
         - "srs.md"
         - "implementation-guide.md"
+
+extra_javascript:
+  - assets/projects.js
 
 extra:
   endpoints:

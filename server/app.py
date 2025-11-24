@@ -1,5 +1,6 @@
 # server/app.py
 from pathlib import Path
+import os
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -11,17 +12,18 @@ from .db import init_db
 
 app = FastAPI(title="Architecture Workbench Registry")
 
-# --- CORS so docs.shafie.org can fetch /api/projects, etc. ---
+# --- CORS (configurable) ---
+docs_origin = os.getenv("DOCS_BASE_URL", "https://docs.shafie.org")
+allow = [o.strip() for o in docs_origin.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allow or ["*"],
     allow_credentials=False,
-    allow_methods=["*"],
+    allow_methods=["GET", "OPTIONS", "DELETE", "POST"],
     allow_headers=["*"],
 )
-# --------------------------------------------------------------
+# ---------------------------
 
-# Static & favicon
 static_dir = Path(__file__).parent / "static"
 if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
