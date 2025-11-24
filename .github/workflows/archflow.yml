@@ -78,12 +78,19 @@ jobs:
         shell: bash
         run: |
           set -e
-          python3 -c "import pathlib; r=pathlib.Path('packages'); items=sorted([p.name for p in r.iterdir() if p.is_dir()]); out=['# Architecture Catalog',''] + [f'- [{s}](packages/{s}.md)' for s in items]; pathlib.Path('docs/catalog.md').write_text('\n'.join(out)+'\n', encoding='utf-8')"
+          python3 - <<'PY'
+import pathlib
+root = pathlib.Path("packages")
+items = sorted([p.name for p in root.iterdir() if p.is_dir()])
+out = ["# Architecture Catalog", ""]
+out += [f"- [{s}](packages/{s}.md)" for s in items]
+pathlib.Path("docs/catalog.md").write_text("\n".join(out) + "\n", encoding="utf-8")
+PY
 
       - name: Validate intake is edited (fail fast if still template)
         shell: bash
         run: |
-          PID='${{ steps.meta.outputs.package_id }}'
+          PID="${{ steps.meta.outputs.package_id }}"
           if grep -q 'TBD' "packages/$PID/intake.yaml"; then
             echo "::error::Please edit packages/$PID/intake.yaml (replace TBDs) before generation."
             exit 1
@@ -190,12 +197,66 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
       - run: python -m pip install mkdocs mkdocs-material mkdocs-macros-plugin
+
+      # >>> NEW: fetch projects from Workbench, generate Projects page & nav
+      - name: Sync projects page from Workbench
+        env:
+          WORKBENCH_URL: ${{ vars.WORKBENCH_URL }}
+        run: |
+          python - <<'PY'
+import json, os, pathlib, urllib.request
+root = pathlib.Path("docs")
+projects_dir = root / "projects"
+projects_dir.mkdir(parents=True, exist_ok=True)
+
+base = os.getenv("WORKBENCH_URL") or "https://workbench.shafie.org"
+url  = base.rstrip("/") + "/api/projects"
+
+try:
+    with urllib.request.urlopen(url, timeout=12) as r:
+        items = json.load(r)
+except Exception as e:
+    print(f"::warning::Could not fetch {url}: {e}")
+    # Do not fail the build; keep existing index.md
+    raise SystemExit(0)
+
+# Sort newest first if created_at present
+def k(x): return (x.get("created_at") or "", x.get("slug") or "")
+items = sorted(items, key=k, reverse=True)
+
+# Write docs/projects/index.md
+lines = ["# Projects", ""]
+for p in items:
+    name = p.get("name","").strip() or p.get("slug","")
+    slug = p.get("slug","")
+    if slug:
+        lines.append(f"- [{name}](../projects/{slug}/)")
+index_md = "\n".join(lines) + "\n"
+(projects_dir / "index.md").write_text(index_md, encoding="utf-8")
+
+# Global nav fragment (if included by mkdocs.yml)
+nav = ["- Projects:", "  - Overview: projects/index.md"]
+for p in items:
+    name = p.get("name","").replace(":", "\\:")
+    slug = p.get("slug","")
+    if slug:
+        nav.append(f"  - {name}: projects/{slug}/index.md")
+(root / "_generated_projects_nav.yml").write_text("\n".join(nav) + "\n", encoding="utf-8")
+
+# Local nav fragment (for per-section includes)
+(projects_dir / "_nav.generated.yml").write_text("\n".join(nav) + "\n", encoding="utf-8")
+PY
+      # <<< NEW
+
       - name: Build site
         run: mkdocs build --strict
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site

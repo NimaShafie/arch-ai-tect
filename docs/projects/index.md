@@ -1,6 +1,5 @@
 # Projects
 
-- [Disney+AI+V3](./disney+ai+v3/index.md)
-- [Disney Ai Test](./disney-ai-test/index.md)
-- [Disney Ai V2](./disney-ai-v2/index.md)
-- [Disney Ai V3](./disney-ai-v3/index.md)
+_This page is auto-generated during the GitHub Action build from `https://workbench.shafie.org/api/projects`._
+If you’re viewing this locally without running the Action, the list may be empty.
+
