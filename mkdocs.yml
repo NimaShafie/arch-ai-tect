@@ -4,7 +4,6 @@ site_url: https://docs.shafie.org
 theme:
   name: material
   features:
-    - navigation.instant
     - navigation.top
     - content.code.copy
     - content.tabs.link
