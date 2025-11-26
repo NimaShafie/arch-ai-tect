@@ -1,1 +1,7 @@
-[]
+projects:
+- slug: disney-ai-v3
+  title: Disney+AI+V3
+  url: /projects/disney-ai-v3/
+- slug: test-2
+  title: test-2
+  url: /projects/test-2/

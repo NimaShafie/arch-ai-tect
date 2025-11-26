@@ -3,46 +3,41 @@
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from server.db import init_db
-from server.routers import brief, brief_ai, ui, generate
+from server.routers import ui, brief, brief_ai, generate
+
+
+BASE_DIR = Path(__file__).resolve().parent  # /home/n1mz/arch-workbench/server
 
 
 def create_app() -> FastAPI:
     app = FastAPI(title="ArchAiTect Workbench")
 
-    # Init DB
+    # --- DB init ------------------------------------------------------------
     init_db()
 
-    # Templates
-    app.templates = Jinja2Templates(directory="server/templates")
+    # --- Templates (absolute path) -----------------------------------------
+    app.templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
-    # Static assets (optional)
-    #
-    # Only mount /assets if the directory actually exists to avoid
-    # crashing the whole app when running on a fresh checkout or a
-    # server that doesn't ship front-end assets.
-    assets_dir = Path(__file__).parent / "assets"
-    if assets_dir.exists():
-        app.mount(
-            "/assets",
-            StaticFiles(directory=str(assets_dir)),
-            name="assets",
-        )
+    # --- Static / assets (favicon, CSS, etc.) ------------------------------
+    static_dir = BASE_DIR / "static"
+    if static_dir.exists():
+        # One StaticFiles instance, mounted on BOTH /static and /assets
+        static_files = StaticFiles(directory=str(static_dir))
+        app.mount("/static", static_files, name="static")
+        app.mount("/assets", static_files, name="assets")
 
-    # UI + API routers
-    app.include_router(ui.router)        # Workbench HTML + JSON API
-    app.include_router(brief.router)
-    app.include_router(brief_ai.router)
-    app.include_router(generate.router)
+    # --- Routers -----------------------------------------------------------
+    # HTML + JSON UI
+    app.include_router(ui.router)
 
-    # Root redirect to /ui
-    @app.get("/", include_in_schema=False)
-    async def root():
-        return RedirectResponse(url="/ui")
+    # Brief + AI + generation JSON APIs under /api/projects/{slug}/...
+    app.include_router(brief.router, prefix="/api/projects")
+    app.include_router(brief_ai.router, prefix="/api/projects")
+    app.include_router(generate.router, prefix="/api/projects")
 
     return app
 
