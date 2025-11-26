@@ -160,7 +160,7 @@ services:
     depends_on:
       cloudflared:
         condition: service_started
-    profiles: ["tunnel"]  
+    profiles: ["tunnel"]
 
   cloudflared:
     image: cloudflare/cloudflared:latest

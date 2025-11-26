@@ -1,447 +1,426 @@
+<!-- server/templates/ui_project.html -->
 {% extends "base.html" %}
-{% block title %}{{ project.name }} · ArchAiTect{% endblock %}
+{% block title %}{{ project.name }} · Workbench{% endblock %}
 
 {% block content %}
-  <section class="card" style="margin-bottom:24px">
-    <div class="bd" style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap">
-      <div>
-        <div style="font-size:28px; font-weight:800">{{ project.name }}</div>
-        <div class="muted">slug: <code>{{ project.slug }}</code></div>
-        <div class="row" style="margin-top:12px">
-          <a class="pill" href="{{ docs_urls.project_home }}">Project Docs Home</a>
-          <a class="pill" href="{{ docs_urls.package_spec }}">Spec</a>
-          <a class="pill" href="{{ docs_urls.package_srs }}">SRS</a>
-          <a class="pill" href="{{ docs_urls.package_ref }}">Reference Architecture</a>
-          <a class="pill" href="{{ docs_urls.package_impl }}">Implementation Guide</a>
-          <a class="pill" href="{{ docs_urls.diagrams }}">Diagrams</a>
-        </div>
-      </div>
-      <div class="row">
-        <a class="btn primary" href="/ui/{{ project.slug }}/generate" id="btn-generate">Generate Diagrams</a>
-        <a class="btn" href="{{ docs_urls.project_home }}" target="_blank" rel="noopener" id="btn-open-docs">Open Docs ↗</a>
-      </div>
+<div class="shell" style="padding-bottom:60px;">
+
+  <!-- Header -->
+  <div style="margin-bottom:20px;">
+    <h1 class="h1" style="margin-bottom:4px;">{{ project.name }}</h1>
+    <p class="muted" style="margin-bottom:16px;">Project workspace for {{ project.slug }}</p>
+
+    <!-- Docs pill nav -->
+    <div style="display:flex; flex-wrap:wrap; gap:8px;">
+      <a href="{{ docs_base }}/projects/{{ project.slug }}/" target="_blank" class="btn pill">Project Docs Home</a>
+      <a href="{{ docs_base }}/projects/{{ project.slug }}/package/spec/" target="_blank" class="btn pill">Spec</a>
+      <a href="{{ docs_base }}/projects/{{ project.slug }}/package/srs/" target="_blank" class="btn pill">SRS</a>
+      <a href="{{ docs_base }}/projects/{{ project.slug }}/package/reference-arch/" target="_blank" class="btn pill">Reference Architecture</a>
+      <a href="{{ docs_base }}/projects/{{ project.slug }}/package/implementation-guide/" target="_blank" class="btn pill">Implementation Guide</a>
+      <a href="{{ docs_base }}/projects/{{ project.slug }}/diagrams/" target="_blank" class="btn pill">Diagrams</a>
+    </div>
+  </div>
+
+  <!-- Mini tutorial / workflow helper -->
+  <section class="card" style="margin-bottom:20px;">
+    <div style="padding:18px 22px;">
+      <h2 class="h2" style="margin-bottom:6px; font-size:1rem; font-weight:700;">Workflow overview</h2>
+      <p class="muted" style="margin-bottom:10px;">
+        Follow these steps in order to go from a raw idea to generated diagrams and docs:
+      </p>
+      <ol style="margin:0; padding-left:18px; font-size:0.95rem; color:var(--text, #222);">
+        <li style="margin-bottom:4px;">
+          <strong>Requirements Brief</strong> — Describe your system in plain English, then click
+          <em>Interpret with AI</em>. Review / edit the generated brief JSON and click <em>Save Brief</em>.
+        </li>
+        <li style="margin-bottom:4px;">
+          <strong>Generate Architecture</strong> — Choose which diagrams to generate and click
+          <em>Generate Diagrams</em>. This uses the saved brief as input.
+        </li>
+        <li>
+          <strong>View Output</strong> — Open the generated documentation and diagrams via
+          <em>View Documentation</em>.
+        </li>
+      </ol>
     </div>
   </section>
 
-  <div class="grid">
-    <!-- Requirements Brief -->
-    <section class="card" id="brief">
-      <div class="hd">Requirements Brief</div>
-      <div class="bd">
-        <p class="muted" style="margin-top:0">
-          Paste valid JSON. The editor auto-formats and softly validates as you type.
+  <!-- Two-column layout: left = brief, right = generate + view -->
+  <div style="display:flex; gap:24px; align-items:stretch;">
+
+    <!-- LEFT: REQUIREMENTS BRIEF -->
+    <section class="card" style="flex:1.35;">
+      <div style="padding:24px 28px; height:100%; box-sizing:border-box;">
+        <h2 class="h1" style="margin-bottom:10px;">1. Requirements Brief</h2>
+
+        <p class="muted" style="margin-bottom:16px;">
+          Describe your system, key users, major flows, constraints, expectations, and tech preferences.
+          The AI will interpret this and generate a structured brief for the rest of the toolchain.
         </p>
 
-        <!-- JSON textarea styles -->
-        <style>
-          .json-textarea{
-            width: 100%;
-            min-height: 260px;
-            padding: 14px 16px;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-            font-size: 14px;
-            line-height: 1.5;
-            border-radius: 10px;
-            border: 1px solid var(--outline, rgba(0,0,0,.08));
-            background: var(--code-bg, var(--surface-1, #f7f8fb));
-            color: var(--fg, #1b1f24);
-            box-shadow: inset 0 1px 0 rgba(0,0,0,.02);
-            resize: vertical;
-          }
-          .json-textarea:focus{
-            outline: none;
-            border-color: var(--primary, #2962ff);
-            box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary, #2962ff) 25%, transparent);
-            background: var(--surface-1, #f7f8fb);
-          }
-          .json-textarea.error{
-            border-color:#ef4444;
-            box-shadow:0 0 0 3px rgba(239,68,68,.18);
-          }
-          #brief_error{
-            margin-top:8px;
-            color:#b91c1c;
-            font-size:12.5px;
-          }
-        </style>
+        <label class="muted" for="briefPrompt" style="display:block; margin-bottom:6px;">
+          Describe your system
+        </label>
+        <textarea
+          id="briefPrompt"
+          class="input"
+          placeholder="For example: a streaming platform where users can sign in, manage profiles, browse a catalog, and start video playback..."
+          style="min-height:140px; padding:10px 12px; resize:vertical;"
+        ></textarea>
 
-        <form method="post" action="/ui/{{ project.slug }}/brief" autocomplete="off" id="form-brief">
-          <textarea
-            class="json-textarea"
-            name="brief_text"
-            id="brief_text"
-            placeholder='{
-  "goal": "Describe the system purpose",
-  "actors": ["User","System"],
-  "scenarios": [{"name":"Login","steps":["User enters credentials","System verifies","User redirected"]}]
-}'>{{ brief_json }}</textarea>
-          <div id="brief_error" hidden></div>
-          <div class="row" style="margin-top:12px">
-            <button class="btn primary" type="submit" id="btn-save-brief">Save Brief</button>
-          </div>
-        </form>
+        <div style="margin-top:14px;">
+          <button
+            id="interpretBtn"
+            class="btn primary"
+            style="display:inline-flex; align-items:center; justify-content:center; padding:10px 18px;"
+          >
+            Interpret with AI
+          </button>
+        </div>
+
+        <p id="interpretStatus" class="muted" style="margin-top:10px; min-height:18px;"></p>
+
+        <h3 style="margin-top:22px; margin-bottom:8px; font-size:1rem; font-weight:600;">
+          Generated Brief (edit if needed)
+        </h3>
+        <textarea
+          id="briefJson"
+          class="input"
+          style="min-height:260px; font-family:monospace; padding:10px 12px; resize:vertical;"
+        ></textarea>
+
+        <div style="margin-top:14px;">
+          <button
+            id="saveBriefBtn"
+            class="btn"
+            style="display:inline-flex; align-items:center; justify-content:center; padding:9px 16px;"
+          >
+            Save Brief
+          </button>
+        </div>
       </div>
     </section>
 
-    <!-- Diagram Choices -->
-    <section class="card" id="choices">
-      <div class="hd">Diagram Choices</div>
-      <div class="bd">
-        <style>
-          #choices .bd {
-            min-height: 520px;
-            display: flex;
-            flex-direction: column;
-          }
-          #choices form {
-            display: flex;
-            flex-direction: column;
-            gap: 14px;
-            height: 100%;
-          }
-          #choices .fields {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(240px, 1fr));
-            grid-template-rows: repeat(3, 1fr);
-            gap: 16px 22px;
-            flex: 1;
-            align-content: stretch;
-            width: 100%;
-          }
-          /* Tile */
-          #choices .tile {
-            position: relative;
-            height: 100%;
-            min-height: 96px;
-            border: 1px solid var(--outline, rgba(0,0,0,.08));
-            background: var(--surface-1, #f7f8fb);
-            border-radius: 12px;
-            transition: transform .08s ease, box-shadow .15s ease, border-color .15s ease, background .15s ease;
-            overflow: visible;
-            z-index: 1;
-          }
-          #choices .tile:hover {
-            transform: translateY(-1px);
-            border-color: color-mix(in srgb, var(--primary, #2962ff) 22%, transparent);
-            box-shadow: 0 6px 22px rgba(0,0,0,.07);
-          }
-          /* Full-tile label hit area (click anywhere toggles checkbox) */
-          #choices .tile-hit{
-            position: absolute;
-            inset: 0;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 14px 16px;
-            padding-right: 44px; /* room for info icon */
-            cursor: pointer;
-            border-radius: 12px;
-          }
-          #choices .tile input[type="checkbox"]{ transform: translateY(1px); }
-          #choices .label-text{
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-          }
-          /* Info icon (does not toggle checkbox) */
-          #choices .info {
-            position: absolute;
-            right: 12px;
-            top: 12px;
-            display: inline-grid;
-            place-items: center;
-            width: 20px;
-            height: 20px;
-            border-radius: 999px;
-            border: 1px solid rgba(0,0,0,.18);
-            background: linear-gradient(#f7f7f9, #efeff3);
-            color: #6b7280;
-            font-size: 12px;
-            line-height: 1;
-            user-select: none;
-            z-index: 3;
-          }
-        </style>
+    <!-- RIGHT COLUMN: GENERATE + VIEW OUTPUT -->
+    <div style="flex:1; display:flex; flex-direction:column; gap:24px; height:100%;">
 
-        <form method="post" action="/ui/{{ project.slug }}/choices" id="form-choices">
-          <div class="fields">
+      <!-- Generate Architecture (tile style like previous Diagram Choices) -->
+      <section class="card" id="choices" style="flex:1;">
+        <div class="bd" style="padding:24px 28px; height:100%; box-sizing:border-box; display:flex; flex-direction:column;">
+          <h2 class="h1" style="margin-bottom:10px;">2. Generate Architecture</h2>
+          <p class="muted" style="margin-bottom:16px;">
+            Select which architectural diagrams to generate based on the Requirements Brief.
+          </p>
 
-            <div class="tile">
-              <label class="tile-hit">
-                <input type="checkbox" name="c4_context" />
-                <span class="label-text">C4 Context</span>
-              </label>
-              <span class="info" aria-label="What is C4 Context"
-                    data-tip="The highest-level C4 diagram. Shows the system in its environment: primary users, external systems, and major relationships.">i</span>
+          <!-- Tile styles copied/adapted from previous implementation (style only) -->
+          <style>
+            #choices .fields {
+              display: grid;
+              grid-template-columns: repeat(2, minmax(200px, 1fr));
+              grid-template-rows: repeat(3, 1fr);
+              gap: 16px 22px;
+              flex: 1;
+              align-content: stretch;
+              width: 100%;
+            }
+            #choices .tile {
+              position: relative;
+              height: 100%;
+              min-height: 96px;
+              border: 1px solid var(--outline, rgba(0,0,0,.08));
+              background: var(--surface-1, #f7f8fb);
+              border-radius: 12px;
+              transition:
+                transform .08s ease,
+                box-shadow .15s ease,
+                border-color .15s ease,
+                background .15s ease;
+              overflow: visible;
+              z-index: 1;
+            }
+            #choices .tile:hover {
+              transform: translateY(-1px);
+              border-color: color-mix(in srgb, var(--primary, #2962ff) 22%, transparent);
+              box-shadow: 0 6px 22px rgba(0,0,0,.07);
+            }
+            #choices .tile-hit {
+              position: absolute;
+              inset: 0;
+              display: flex;
+              align-items: center;
+              gap: 10px;
+              padding: 14px 16px;
+              padding-right: 16px;
+              cursor: pointer;
+              border-radius: 12px;
+            }
+            #choices .tile input[type="checkbox"] {
+              transform: translateY(1px);
+            }
+            #choices .label-text {
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+            }
+          </style>
+
+          <form id="diagramForm" style="display:flex; flex-direction:column; flex:1;">
+            <div class="fields">
+              <div class="tile">
+                <label class="tile-hit">
+                  <input type="checkbox" name="choices" value="c4_context" />
+                  <span class="label-text">C4 Context</span>
+                </label>
+              </div>
+
+              <div class="tile">
+                <label class="tile-hit">
+                  <input type="checkbox" name="choices" value="c4_container" />
+                  <span class="label-text">C4 Container</span>
+                </label>
+              </div>
+
+              <div class="tile">
+                <label class="tile-hit">
+                  <input type="checkbox" name="choices" value="c4_component" />
+                  <span class="label-text">C4 Component</span>
+                </label>
+              </div>
+
+              <div class="tile">
+                <label class="tile-hit">
+                  <input type="checkbox" name="choices" value="sequence" />
+                  <span class="label-text">Sequence</span>
+                </label>
+              </div>
+
+              <div class="tile">
+                <label class="tile-hit">
+                  <input type="checkbox" name="choices" value="deployment" />
+                  <span class="label-text">Deployment</span>
+                </label>
+              </div>
+
+              <div class="tile">
+                <label class="tile-hit">
+                  <input type="checkbox" name="choices" value="logical" />
+                  <span class="label-text">Logical</span>
+                </label>
+              </div>
             </div>
 
-            <div class="tile">
-              <label class="tile-hit">
-                <input type="checkbox" name="c4_container" />
-                <span class="label-text">C4 Container</span>
-              </label>
-              <span class="info" aria-label="What is C4 Container"
-                    data-tip="Breaks the system into deployable containers (web app, API, services, databases, queues) and how they communicate.">i</span>
+            <div style="margin-top:12px;">
+              <button
+                class="btn primary"
+                id="generateBtn"
+                style="display:inline-flex; align-items:center; justify-content:center; padding:10px 18px;"
+              >
+                Generate Diagrams
+              </button>
             </div>
 
-            <div class="tile">
-              <label class="tile-hit">
-                <input type="checkbox" name="c4_component" />
-                <span class="label-text">C4 Component</span>
-              </label>
-              <span class="info" aria-label="What is C4 Component"
-                    data-tip="Zooms into a single container to show key components/modules inside it and their dependencies and responsibilities.">i</span>
-            </div>
+            <p id="genStatus" class="muted" style="margin-top:10px; min-height:18px;"></p>
+          </form>
+        </div>
+      </section>
 
-            <div class="tile">
-              <label class="tile-hit">
-                <input type="checkbox" name="sequence" />
-                <span class="label-text">Sequence</span>
-              </label>
-              <span class="info" aria-label="What is a Sequence diagram"
-                    data-tip="Time-ordered interactions for a scenario (e.g., login, checkout). Helpful for step-by-step flows across services.">i</span>
-            </div>
+      <!-- View Output (directly under Generate Architecture) -->
+      <section class="card">
+        <div style="padding:24px 28px;">
+          <h2 class="h1" style="margin-bottom:10px;">3. View Output</h2>
+          <p class="muted" style="margin-bottom:14px;">
+            Browse generated documentation and diagrams rendered via MkDocs and PlantUML/Kroki.
+          </p>
 
-            <div class="tile">
-              <label class="tile-hit">
-                <input type="checkbox" name="deployment" />
-                <span class="label-text">Deployment</span>
-              </label>
-              <span class="info" aria-label="What is a Deployment diagram"
-                    data-tip="Shows infrastructure nodes (regions, clusters, pods, VMs) and where containers run, including runtime and networking.">i</span>
-            </div>
+          <a
+            href="{{ docs_base }}/projects/{{ project.slug }}/"
+            target="_blank"
+            class="btn"
+            style="display:inline-flex; align-items:center; justify-content:center; padding:9px 18px;"
+          >
+            View Documentation
+          </a>
+        </div>
+      </section>
 
-            <div class="tile">
-              <label class="tile-hit">
-                <input type="checkbox" name="logical" />
-                <span class="label-text">Logical (Mermaid)</span>
-              </label>
-              <span class="info" aria-label="What is a Logical diagram"
-                    data-tip="High-level logical view (Mermaid) of domains/modules and relationships—useful for early design discussions.">i</span>
-            </div>
+    </div>
 
-          </div>
-
-          <div class="row" style="margin-top:12px">
-            <button class="btn primary" type="submit" id="btn-save-choices">Save Choices</button>
-          </div>
-        </form>
-      </div>
-    </section>
   </div>
-{% endblock %}
 
-{% block scripts %}
+</div>
+
 <script>
-  // --- Auto-format/validate JSON in the brief editor ------------------------
-  const ta = document.getElementById('brief_text');
+// Load existing brief.json into the editor on page load
+(async () => {
+  try {
+    const r = await fetch("/api/projects/{{ project.slug }}/brief");
+    if (!r.ok) return;
+    const data = await r.json();
+    if (data.brief) {
+      document.querySelector("#briefJson").value =
+        JSON.stringify(data.brief, null, 2);
+    }
+  } catch (err) {
+    console.error("Failed to load brief:", err);
+  }
+})();
 
-  function parseRelaxed(s) {
-    s = (s ?? "").trim();
-    const looksQuoted = (s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"));
+// Interpret Requirements with AI
+document.querySelector("#interpretBtn").addEventListener("click", async () => {
+  const prompt = document.querySelector("#briefPrompt").value.trim();
+  if (!prompt) {
+    alert("Enter a prompt first.");
+    return;
+  }
+
+  const status = document.querySelector("#interpretStatus");
+  status.textContent = "Interpreting with AI...";
+
+  try {
+    const r = await fetch("/api/projects/{{ project.slug }}/brief/interpret", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt })
+    });
+
+    const contentType = r.headers.get("content-type") || "";
+    let detail = "";
+    if (contentType.includes("application/json")) {
+      const data = await r.json().catch(() => ({}));
+      if (data && data.brief) {
+        document.querySelector("#briefJson").value =
+          JSON.stringify(data.brief, null, 2);
+      }
+      detail = data.detail || "";
+    } else {
+      // Plain text / HTML error body (e.g., 404 HTML page)
+      const text = await r.text().catch(() => "");
+      detail = text ? text.slice(0, 140) + (text.length > 140 ? "…" : "") : "";
+    }
+
+    if (!r.ok) {
+      let hint = "";
+      if (r.status === 404) {
+        hint = "The AI interpretation endpoint was not found. " +
+               "This usually means the backend API for AI is disabled or not deployed. " +
+               "Verify that the server is running the version with /brief/interpret configured " +
+               "and that it can reach your OpenWebUI model.";
+      } else if (r.status >= 500) {
+        hint = "The AI backend returned a server error. Check the API logs and your OpenWebUI / Cloudflare setup.";
+      }
+      throw new Error(
+        `HTTP ${r.status}. ${detail || ""} ${hint}`.trim()
+      );
+    }
+
+    status.textContent = "AI interpretation complete.";
+  } catch (err) {
+    console.error(err);
+    status.textContent = "Error calling AI: " + err.message;
+  }
+});
+
+// Save brief.json
+document.querySelector("#saveBriefBtn").addEventListener("click", async () => {
+  try {
+    const text = document.querySelector("#briefJson").value;
+    const trimmed = text.trim();
+    if (!trimmed) {
+      alert("Nothing to save yet. Use 'Interpret with AI' first or paste a brief JSON.");
+      return;
+    }
+
+    let parsed;
     try {
-      let first = JSON.parse(s);
-      if (typeof first === 'string') {
-        try { return JSON.parse(first); }
-        catch {
-          const maybeJson = first.replaceAll('\\n', '\n');
-          try { return JSON.parse(maybeJson); } catch {}
-          return first;
-        }
-      }
-      return first;
-    } catch {
-      if (looksQuoted) { try { return JSON.parse(s.slice(1, -1)); } catch {} }
-      return s;
+      parsed = JSON.parse(trimmed);
+    } catch (e) {
+      alert("The Generated Brief is not valid JSON. Fix it or re-run 'Interpret with AI'.\n\n" + e.message);
+      return;
     }
+
+    const r = await fetch("/api/projects/{{ project.slug }}/brief", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ brief: parsed })
+    });
+
+    if (!r.ok) throw new Error(`Failed to save brief (HTTP ${r.status}).`);
+    alert("Brief saved.");
+  } catch (err) {
+    console.error(err);
+    alert("Save failed: " + err.message);
+  }
+});
+
+// Generate diagrams
+document.querySelector("#generateBtn").addEventListener("click", async (e) => {
+  e.preventDefault();
+  const status = document.querySelector("#genStatus");
+  status.textContent = "";
+
+  const briefText = document.querySelector("#briefJson").value.trim();
+  if (!briefText) {
+    status.textContent =
+      "To generate diagrams, first use '1. Requirements Brief' → 'Interpret with AI', then review and save the Generated Brief.";
+    return;
   }
 
-  function pretty(s){
-    const parsed = parseRelaxed(s);
-    if (parsed && (typeof parsed === 'object')) {
-      return JSON.stringify(parsed, null, 2) + "\n";
-    }
-    return s;
+  try {
+    JSON.parse(briefText);
+  } catch (err) {
+    status.textContent =
+      "The Generated Brief is not valid JSON. Fix it or click 'Interpret with AI' again before generating diagrams.";
+    return;
   }
 
-  if (ta && ta.value) ta.value = pretty(ta.value);
+  const form = document.querySelector("#diagramForm");
+  const choices = Array.from(
+    form.querySelectorAll("input[name='choices']:checked")
+  ).map(c => c.value);
 
-  let tmr;
-  ta && ta.addEventListener('input', ()=>{
-    clearTimeout(tmr);
-    tmr = setTimeout(()=>{
-      const start = ta.selectionStart;
-      const v = pretty(ta.value);
-      if (v !== ta.value) {
-        ta.value = v;
-        const pos = Math.min(v.length, start);
-        ta.setSelectionRange(pos, pos);
+  if (choices.length === 0) {
+    status.textContent = "Select at least one diagram type before generating.";
+    return;
+  }
+
+  status.textContent = "Generating diagrams...";
+
+  try {
+    const r = await fetch("/ui/{{ project.slug }}/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ choices })
+    });
+
+    const contentType = r.headers.get("content-type") || "";
+    let detail = "";
+
+    if (contentType.includes("application/json")) {
+      const data = await r.json().catch(() => ({}));
+      detail = data.detail || "";
+      if (!r.ok) {
+        throw new Error(
+          `HTTP ${r.status} ${r.statusText || ""}. ${detail}`.trim()
+        );
       }
-    }, 300);
-  });
-
-  // --- Body-level tooltip (fixed, clamped, no scrollbars) -------------------
-  (function setupInfoTooltips(){
-    const tooltip = document.createElement('div');
-    tooltip.id = 'aw-tooltip';
-    Object.assign(tooltip.style, {
-      position: 'fixed',
-      left: '0px',
-      top: '0px',
-      transform: 'translate(-9999px,-9999px)',
-      padding: '10px 12px',
-      borderRadius: '10px',
-      background: '#111827',
-      color: '#fff',
-      fontSize: '12px',
-      lineHeight: '1.45',
-      maxWidth: '46ch',
-      width: 'max-content',
-      boxShadow: '0 10px 24px rgba(0,0,0,.18)',
-      pointerEvents: 'none',
-      zIndex: '100000',
-      opacity: '0',
-      transition: 'opacity .12s ease'
-    });
-    document.body.appendChild(tooltip);
-
-    function show(el, evt){
-      tooltip.textContent = el.getAttribute('data-tip') || '';
-      tooltip.style.opacity = '1';
-      position(evt);
-    }
-    function hide(){
-      tooltip.style.opacity = '0';
-      tooltip.style.transform = 'translate(-9999px,-9999px)';
-    }
-    function position(evt){
-      const pad = 12, vw = window.innerWidth, vh = window.innerHeight;
-      tooltip.style.transform = `translate(${evt.clientX + pad}px, ${evt.clientY + pad}px)`;
-      const rect = tooltip.getBoundingClientRect();
-      let x = evt.clientX + pad, y = evt.clientY + pad;
-      if (x + rect.width + pad > vw) x = Math.max(pad, vw - rect.width - pad);
-      if (y + rect.height + pad > vh) y = Math.max(pad, vh - rect.height - pad);
-      tooltip.style.transform = `translate(${x}px, ${y}px)`;
-    }
-
-    document.querySelectorAll('#choices .info').forEach(el=>{
-      el.addEventListener('mouseenter', e => show(el, e));
-      el.addEventListener('mousemove', position);
-      el.addEventListener('mouseleave', hide);
-      el.addEventListener('mousedown', e => e.preventDefault());
-    });
-  })();
-
-  // --- Persist state across POST/redirects (localStorage) -------------------
-  (function persistState(){
-    const slug = {{ project.slug | tojson }};
-    const keyChoices = `aw:choices:${slug}`;
-    const keyBrief = `aw:brief:${slug}`;
-
-    const chkSelector = '#choices input[type="checkbox"]';
-
-    function readChoices(){
-      try { return JSON.parse(localStorage.getItem(keyChoices) || '[]'); }
-      catch { return []; }
-    }
-    function writeChoices(list){
-      try { localStorage.setItem(keyChoices, JSON.stringify(list)); } catch {}
-    }
-    function collectChoices(){
-      return Array.from(document.querySelectorAll(chkSelector))
-        .filter(i => i.checked)
-        .map(i => i.name);
-    }
-    function applyChoices(list){
-      const set = new Set(list || []);
-      document.querySelectorAll(chkSelector).forEach(i => {
-        i.checked = set.has(i.name);
-      });
-    }
-
-    function readBrief(){
-      try { return localStorage.getItem(keyBrief) || ''; } catch { return ''; }
-    }
-    function writeBrief(text){
-      try { localStorage.setItem(keyBrief, text ?? ''); } catch {}
-    }
-
-    // Restore on load
-    applyChoices(readChoices());
-    const savedBrief = readBrief();
-    if (savedBrief && ta) ta.value = savedBrief;
-
-    // Save on input/change
-    document.querySelectorAll(chkSelector).forEach(i => {
-      i.addEventListener('change', () => writeChoices(collectChoices()));
-    });
-    ta && ta.addEventListener('input', () => writeBrief(ta.value));
-
-    // Save immediately on submits / generate click
-    const formBrief = document.getElementById('form-brief');
-    const formChoices = document.getElementById('form-choices');
-    const btnGenerate = document.getElementById('btn-generate');
-
-    formBrief && formBrief.addEventListener('submit', () => {
-      writeBrief(ta ? ta.value : '');
-      writeChoices(collectChoices());
-    });
-
-    formChoices && formChoices.addEventListener('submit', () => {
-      writeBrief(ta ? ta.value : '');
-      writeChoices(collectChoices());
-    });
-
-    btnGenerate && btnGenerate.addEventListener('click', () => {
-      writeBrief(ta ? ta.value : '');
-      writeChoices(collectChoices());
-    });
-  })();
-
-  // --- Strict JSON validation & feedback on Save Brief ---------------------
-  (function briefValidation(){
-    const form = document.getElementById('form-brief');
-    if (!form || !ta) return;
-    const err = document.getElementById('brief_error');
-
-    function isValidJsonObjectOrArray(text){
-      try {
-        const parsed = JSON.parse(text);
-        return parsed !== null && typeof parsed === 'object';
-      } catch { return false; }
-    }
-
-    form.addEventListener('submit', (e)=>{
-      const text = (ta.value || '').trim();
-      if (!isValidJsonObjectOrArray(text)){
-        e.preventDefault();
-        if (err){
-          err.textContent = 'Invalid JSON. Please provide a valid JSON object/array (tip: use { ... } or [ ... ]).';
-          err.hidden = false;
-        }
-        ta.classList.add('error');
-        if (typeof showToast === 'function'){
-          showToast('Invalid JSON in Brief. Not saved.', 'error', 4200);
-        }
-        // Keep focus for immediate correction
-        ta.focus();
-        return;
+    } else {
+      const text = await r.text().catch(() => "");
+      detail = text ? text.slice(0, 140) + (text.length > 140 ? "…" : "") : "";
+      if (!r.ok) {
+        throw new Error(
+          `Diagram generation failed (HTTP ${r.status} ${r.statusText || ""}). ` +
+          "The server returned a non-JSON response (likely an HTML error page). " +
+          "Check that the backend generation endpoint is reachable. "
+        );
       }
-      // Clear any previous error on success
-      if (err){ err.hidden = true; }
-      ta.classList.remove('error');
-      // Optional feedback before round-trip
-      if (typeof showToast === 'function'){
-        showToast('Saving brief…', 'success');
-      }
-    });
-  })();
+    }
 
-  // --- Toasts on redirects --------------------------------------------------
-  const flags = {{ flags | tojson }};
-  if (flags.brief){ showToast('Brief saved.', 'success'); }
-  if (flags.choices){ showToast('Choices saved.', 'success'); }
-  if (flags.gen){ showToast('Generation started/completed.', 'success'); }
-  if (flags.generr){ showToast('Generation failed. Check server logs.', 'error', 4200); }
+    status.textContent = "Generation complete. Open '3. View Output' ➜ 'View Documentation' to see the results.";
+  } catch (err) {
+    console.error(err);
+    status.textContent = "Error during generation: " + err.message;
+  }
+});
 </script>
+
 {% endblock %}

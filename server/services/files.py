@@ -4,138 +4,107 @@ from __future__ import annotations
 from pathlib import Path
 import json
 import yaml
-import os
 import subprocess
 from typing import Any, Dict, Optional
 
 # -----------------------------------------------------------------------------#
 # Constants
 # -----------------------------------------------------------------------------#
+
 DOCS_DIR = Path("docs")
 PROJECTS_DIR = DOCS_DIR / "projects"
 
-INDEX_TEMPLATE = """# {title}
-
-This space is scaffolded and ready.
-
-**Next steps (in the Workbench UI):**
-1. Fill the high-level brief → {ui_base}/ui/{slug}#brief
-2. Choose diagram types & dialects → {ui_base}/ui/{slug}#choices
-3. Generate artifacts → {ui_base}/ui/{slug}#generate
-
-Once generated, diagrams and specifications will appear here under this project.
-"""
 
 # -----------------------------------------------------------------------------#
-# Public API
+# Project tree helpers
 # -----------------------------------------------------------------------------#
-def ensure_project_tree(
-    slug: str,
-    name: Optional[str] = None,
-    nav_title: Optional[str] = None
-) -> Path:
+
+def ensure_project_tree(slug: str) -> Path:
     """
-    Ensure docs/projects/<slug>/ exists with an index.md and a stub manifest.yaml.
-    Safe to call many times. Returns the project directory path.
+    Ensure the standard docs/projects/<slug> tree exists and return its path.
+
+    Layout:
+      docs/projects/<slug>/
+        index.md
+        brief.json
+        manifest.yaml
+        package/
+          spec.md
+          srs.md
+          reference-arch.md
+          implementation-guide.md
+        diagrams/
+          src/
+          images/
     """
-    pdir = PROJECTS_DIR / slug
-    pdir.mkdir(parents=True, exist_ok=True)
-
-    # Landing page
-    index_md = pdir / "index.md"
-    if not index_md.exists():
-        ui_base = os.getenv("UI_BASE", "https://workbench.shafie.org")
-        title = name or slug.replace("-", " ").title()
-        index_md.write_text(
-            INDEX_TEMPLATE.format(title=title, slug=slug, ui_base=ui_base),
-            encoding="utf-8",
-        )
-
-    # Minimal manifest for nav/title + sane defaults so MkDocs builds cleanly
-    manifest = pdir / "manifest.yaml"
-    if not manifest.exists():
-        manifest.write_text(
-            yaml.safe_dump(
-                {
-                    "slug": slug,
-                    "name": name or slug.replace("-", " ").title(),
-                    "nav_title": nav_title or name or slug.replace("-", " ").title(),
-                    "diagram_types": ["c4-context", "c4-container", "deployment", "sequence", "logical"],
-                    "dialects": ["structurizr", "plantuml", "mermaid"],
-                },
-                sort_keys=False,
-            ),
-            encoding="utf-8",
-        )
-
-    # Optionally kick a docs rebuild on first scaffold
-    try:
-        trigger_mkdocs_rebuild()
-    except Exception:
-        # never crash caller
-        pass
-
-    return pdir
+    base = PROJECTS_DIR / slug
+    (base / "package").mkdir(parents=True, exist_ok=True)
+    (base / "diagrams" / "src").mkdir(parents=True, exist_ok=True)
+    (base / "diagrams" / "images").mkdir(parents=True, exist_ok=True)
+    return base
 
 
-# Back-compat shim (older code may import this)
-def render_project_index(slug: str, title: Optional[str] = None) -> Path:
+# -----------------------------------------------------------------------------#
+# Write helpers
+# -----------------------------------------------------------------------------#
+
+def write_json(path: Path, data: Any) -> str:
     """
-    Backwards-compatible helper used by older orchestrators.
-    Simply calls ensure_project_tree() which writes index.md.
+    Write JSON to path and return the written text.
+    Also triggers an optional MkDocs rebuild if inside docs/.
     """
-    return ensure_project_tree(slug=slug, name=title)
-
-
-def write_json(path: Path, data: Dict[str, Any]):
-    """
-    Write a JSON file (pretty) and trigger a docs rebuild if under docs/.
-    """
+    text = json.dumps(data, indent=2)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    path.write_text(text, encoding="utf-8")
     _maybe_rebuild(path)
+    return text
 
 
-def write_yaml(path: Path, data: Dict[str, Any]):
+def write_yaml(path: Path, data: Any) -> str:
     """
-    Write a YAML file and trigger a docs rebuild if under docs/.
+    Write YAML to path and return the written text.
+    Also triggers an optional MkDocs rebuild if inside docs/.
     """
+    text = yaml.safe_dump(data, sort_keys=False)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+    path.write_text(text, encoding="utf-8")
     _maybe_rebuild(path)
+    return text
 
 
 # -----------------------------------------------------------------------------#
-# Rebuild helpers
+# MkDocs rebuild hook (best-effort, non-fatal)
 # -----------------------------------------------------------------------------#
-def trigger_mkdocs_rebuild():
+
+def trigger_mkdocs_rebuild() -> None:
     """
-    If MKDOCS_BUILD_CMD is set (e.g. 'mkdocs build --clean -q' or 'make docs'),
-    run it asynchronously. No-op if unset.
+    Optionally trigger a MkDocs rebuild or notify an external watcher that
+    docs/ has changed. This is intentionally a best-effort, non-fatal call.
+
+    You can implement:
+      - a 'make docs' call
+      - a 'touch' on some sentinel file
+      - or leave as a no-op in local dev.
     """
-    cmd = os.getenv("MKDOCS_BUILD_CMD", "").strip()
-    if not cmd:
-        return
-    try:
-        subprocess.Popen(
-            cmd,
-            shell=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-    except Exception:
-        # Never crash caller due to rebuild failures.
-        pass
+    # By default, we do nothing to avoid surprises.
+    # Uncomment or customize if you want automatic rebuilds.
+    # try:
+    #     subprocess.Popen(["make", "docs"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    # except Exception:
+    #     pass
+    return
 
 
-def _maybe_rebuild(path: Path):
+def _maybe_rebuild(path: Path) -> None:
     """
     Trigger a rebuild iff the written path is inside the docs/ tree.
+    Never raises; failures are swallowed.
     """
     try:
         resolved = path.resolve()
-        if DOCS_DIR.resolve() in resolved.parents or resolved.parent == DOCS_DIR.resolve():
+        docs_root = DOCS_DIR.resolve()
+        if docs_root in resolved.parents or resolved == docs_root:
             trigger_mkdocs_rebuild()
     except Exception:
-        # Never crash caller.
+        # Never crash the caller.
         pass

@@ -1,4 +1,6 @@
 # server/services/mkdocs_nav.py
+from __future__ import annotations
+
 from pathlib import Path
 import yaml
 
@@ -7,7 +9,11 @@ PROJECTS_DIR = DOCS_DIR / "projects"
 GENERATED_NAV = PROJECTS_DIR / "_nav.generated.yml"
 PROJECTS_INDEX = PROJECTS_DIR / "index.md"
 
+
 def _title_for(slug: str) -> str:
+    """
+    Determine a human-friendly title for a project slug, preferring manifest.yaml.
+    """
     manifest = PROJECTS_DIR / slug / "manifest.yaml"
     if manifest.exists():
         try:
@@ -17,31 +23,43 @@ def _title_for(slug: str) -> str:
                 return t
         except Exception:
             pass
-    return slug.replace("-", " ").title()
 
-def build_nav():
+    # Fallback: slug -> "My Project"
+    raw = slug.replace("-", " ").strip()
+    return raw.title() if raw else slug
+
+
+def build_nav() -> None:
     """
-    Builds:
-      - docs/projects/_nav.generated.yml  (not currently included in nav; kept for future)
-      - docs/projects/index.md            (overview with correct relative links)
+    Scan docs/projects/* and regenerate:
+      - docs/projects/_nav.generated.yml (for MkDocs nav inclusion)
+      - docs/projects/index.md (simple project index page)
     """
     entries = []
     lines = ["# Projects", ""]
 
     if PROJECTS_DIR.exists():
-        for child in sorted(PROJECTS_DIR.iterdir()):
+        for child in sorted(PROJECTS_DIR.iterdir(), key=lambda p: p.name.lower()):
             if not child.is_dir():
                 continue
             slug = child.name
-            if (child / "index.md").exists():
-                title = _title_for(slug)
-                # keep a generated nav list for possible later use
-                entries.append({title: f"projects/{slug}/index.md"})
-                # correct relative link from docs/projects/index.md to docs/projects/<slug>/index.md
-                lines.append(f"- [{title}](./{slug}/index.md)")
+            index_md = child / "index.md"
+            if not index_md.exists():
+                continue
+
+            title = _title_for(slug)
+
+            # Entry for generated nav
+            entries.append({title: f"projects/{slug}/index.md"})
+
+            # Link line for projects/index.md (relative link)
+            lines.append(f"- [{title}](./{slug}/index.md)")
 
     GENERATED_NAV.parent.mkdir(parents=True, exist_ok=True)
-    GENERATED_NAV.write_text(yaml.safe_dump(entries, sort_keys=False), encoding="utf-8")
+    GENERATED_NAV.write_text(
+        yaml.safe_dump(entries, sort_keys=False),
+        encoding="utf-8",
+    )
 
     PROJECTS_INDEX.parent.mkdir(parents=True, exist_ok=True)
     PROJECTS_INDEX.write_text("\n".join(lines) + "\n", encoding="utf-8")

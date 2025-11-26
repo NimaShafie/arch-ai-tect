@@ -1,10 +1,15 @@
 # server/core/config.py
+
 import os
 
-DOCS_BASE = os.getenv("DOCS_BASE", "https://docs.shafie.org")
-OPENWEBUI_URL = os.getenv("OPENWEBUI_URL", "https://ai.shafie.org")
-OPENWEBUI_API_URL = os.getenv("OPENWEBUI_API_URL", "").strip()
+# MkDocs base for preview links
+DOCS_BASE = os.getenv("DOCS_BASE", "https://docs.shafie.org").rstrip("/")
 
-AW_SECRET = os.getenv("AW_SECRET", "dev-secret-change-me")
-SESSION_COOKIE = "aw_session"
-SHOW_UNASSIGNED = os.getenv("AW_SHOW_UNASSIGNED", "0") == "1"
+# NEW — OpenWebUI API backend URL
+OPENWEBUI_API_URL = os.getenv("OPENWEBUI_API_URL", "").rstrip("/")
+
+# Database URL
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./workbench.db")
+
+# LLM model (optional override)
+DEFAULT_LLM_MODEL = os.getenv("DEFAULT_LLM_MODEL", "qwen2.5")
