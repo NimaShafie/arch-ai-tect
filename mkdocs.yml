@@ -3,18 +3,13 @@ site_url: https://docs.shafie.org
 theme:
   name: material
   features:
-  - navigation.top
-  - navigation.expand
   - content.code.copy
   - content.tabs.link
+  - navigation.tabs
+  - navigation.top
 nav:
 - Home: index.md
-- Projects:
-  - Disney+AI+V3: projects/disney-ai-v3/index.md
-  - test-2: projects/test-2/index.md
-  - All projects: projects/index.md
-- Services: services/index.md
-- Catalog: catalog/index.md
+- Projects: projects/index.md
 markdown_extensions:
 - admonition
 - def_list
@@ -39,6 +34,9 @@ plugins:
     - services.md
     - srs.md
     - implementation-guide.md
+extra_css:
+- assets/extra.css
+- assets/overrides.css
 extra_javascript:
 - assets/projects.js
 extra:

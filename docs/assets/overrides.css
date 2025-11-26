@@ -1,0 +1,4 @@
+/* Hide the section caret icon next to nested nav items (e.g. Projects) */
+.md-nav__item--nested > .md-nav__link::after {
+  display: none;
+}
