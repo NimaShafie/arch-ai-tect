@@ -1,57 +1,50 @@
 site_name: ArchAiTect Workbench
 site_url: https://docs.shafie.org
-
 theme:
   name: material
   features:
-    - navigation.top
-    - content.code.copy
-    - content.tabs.link
-
+  - navigation.top
+  - navigation.expand
+  - content.code.copy
+  - content.tabs.link
 nav:
-  - Home: index.md
-  - Projects:
-      - Overview: projects/index.md
-  - Services: services/index.md
-  - Catalog: catalog/index.md
-  - Diagrams:
-      - Readme: diagrams/README.md
-      - Booking Flow: diagrams/booking-sequence.md
-      - Deployment: diagrams/deployment.md
-
+- Home: index.md
+- Projects:
+  - Disney+AI+V3: projects/disney-ai-v3/index.md
+  - test-2: projects/test-2/index.md
+  - All projects: projects/index.md
+- Services: services/index.md
+- Catalog: catalog/index.md
 markdown_extensions:
-  - admonition
-  - def_list
-  - footnotes
-  - toc:
-      permalink: true
-  - pymdownx.details
-  - pymdownx.superfences
-  - pymdownx.highlight
-  - pymdownx.tabbed
-  - attr_list
-  - tables
-
+- admonition
+- def_list
+- footnotes
+- toc:
+    permalink: true
+- pymdownx.details
+- pymdownx.superfences
+- pymdownx.highlight
+- pymdownx.tabbed
+- attr_list
+- tables
 plugins:
-  - search
-  - macros
-  - kroki:
-  - exclude:
-      glob:
-        - "package/**"
-        - "architecture/**"
-        - "catalog.md"
-        - "services.md"
-        - "srs.md"
-        - "implementation-guide.md"
-
+- search
+- macros
+- kroki: null
+- exclude:
+    glob:
+    - package/**
+    - architecture/**
+    - catalog.md
+    - services.md
+    - srs.md
+    - implementation-guide.md
 extra_javascript:
-  - assets/projects.js
-
+- assets/projects.js
 extra:
   endpoints:
-    # You can set these in GH Actions with a yq replace or leave as docs-only hints.
+    workbench: https://workbench.shafie.org/
     openwebui: https://ai.shafie.org/
     kroki: https://kroki.shafie.org/
     plantuml: https://uml.shafie.org/
-    # workbench: https://workbench.shafie.org
+    docs: https://docs.shafie.org/

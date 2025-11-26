@@ -1,47 +1,57 @@
-# Architecture Blueprint Kit (Agnostic)
+# ArchAiTect Workbench Docs
 
-Use these prompts and tools to generate C4 (Structurizr), Deployment/Sequence (PlantUML), and Logical (Mermaid) diagrams for any project. Paste outputs into the `diagrams/` folder or directly into these pages.
+This site is the documentation front-end for the **ArchAiTect Workbench**.
+
+The flow looks like this:
+
+1. You create or update a project in the Workbench UI at `https://workbench.shafie.org/`.
+2. The Workbench writes package docs and diagram stubs into the `docs/` tree under `/projects/<slug>/`.
+3. MkDocs Material builds those files and serves them here at `https://docs.shafie.org/`.
+
+Use the **Projects** section in the left navigation to jump straight into a project workspace.
 
 ---
 
 ## Live endpoints
 
-- **Open WebUI (Ollama backend):** https://ai.shafie.org/
-- **Kroki (diagram as a service):** _not deployed_ (placeholder was `http://localhost:8000`)
-- **PlantUML server:** _not deployed_ (placeholder was `http://localhost:18080`)
+- **Workbench UI:** `https://workbench.shafie.org/`
+- **Open WebUI (chat frontend):** {{ config.extra.endpoints.openwebui }}
+- **Kroki (diagram as a service):** {{ config.extra.endpoints.kroki }}
+- **PlantUML server:** {{ config.extra.endpoints.plantuml }}
+- **MkDocs (this site):** `https://docs.shafie.org/`
 
-> ℹ️ When Kroki or PlantUML go live, update the URLs here and on the **Services** page.
+All of these run inside the same self-hosted stack and are wired together by the Workbench backend.
 
 ---
 
-## What we’re building
+## What we're building
 
 - **Self-hosted AI workbench** for architecture docs & diagrams  
-  - Chat + prompt workflows via **Open WebUI** backed by **Ollama**
-  - MkDocs Material site as the canonical, linkable knowledge base  
-- **Diagramming**:
-  - Mermaid (inline in Markdown)
-  - _(Planned)_ Kroki for many formats (Mermaid/PlantUML/Graphviz/etc.)
-  - _(Planned)_ Dedicated PlantUML server for higher-fidelity UML
+  - Projects and briefs are managed via the FastAPI Workbench (`workbench.shafie.org`).
+  - Diagrams and specs are generated into this MkDocs site.
+- **Diagramming:**
+  - Mermaid (inline in Markdown).
+  - Kroki + PlantUML for richer sequence/deployment/UML diagrams.
+- **Canonical knowledge base:**
+  - Each project lives under `/projects/<slug>/` with:
+    - Package docs (Spec, SRS, Reference Architecture, Implementation Guide).
+    - A `diagrams/` area for C4 / sequence / deployment diagrams.
 
 ---
 
 ## Stack at a glance
 
-- **Docs**: MkDocs + Material theme
-- **AI**: Open WebUI ↔ Ollama (models cached in Docker volume)
-- **Reverse proxy / TLS**: Nginx + Let’s Encrypt (ai.shafie.org, docs.shafie.org)
-- **Infra**: Docker Compose
+- **Docs:** MkDocs + Material theme (this site)
+- **AI & prompts:** Open WebUI ↔ Ollama (LLM backend)
+- **Workbench API:** FastAPI app that owns projects, briefs, and generators
+- **Diagram rendering:** Kroki + PlantUML containers
+- **Reverse proxy / TLS:** Cloudflared tunnel + Nginx / TLS endpoints
+- **Infra:** Docker Compose
 
 ---
 
-See the [Catalog](catalog/index.md) for all architecture packages.
+## Next steps
 
----
-
-## Next steps (roadmap)
-
-- [ ] Stand up **Kroki** behind your proxy (e.g., `https://kroki.shafie.org/`)
-- [ ] Stand up **PlantUML** (e.g., `https://uml.shafie.org/`)
-- [ ] Add example C4, sequence, and deployment diagrams under `diagrams/`
-- [ ] Document backup/restore for model cache and docs build artifacts
+- Create a project in the Workbench and save a brief.
+- Run the generators so package docs & diagram stubs are written under `/docs/projects/<slug>/`.
+- Commit & deploy the updated docs so they appear automatically under **Projects** in this site.

@@ -98,15 +98,33 @@ services:
     container_name: docs
     restart: unless-stopped
     working_dir: /work
-    command: serve -a 0.0.0.0:8080
+
+    # 👉 Do a clean build into /var/mkdocs/site, then run mkdocs serve
+    # using that same site dir, watching docs/ and mkdocs.yml for changes.
+    command: >
+      sh -lc "
+        mkdocs build --clean --site-dir /var/mkdocs/site &&
+        mkdocs serve
+          -a 0.0.0.0:8080
+          --site-dir /var/mkdocs/site
+          --watch docs
+          --watch mkdocs.yml
+          --dirtyreload
+      "
+
     environment:
       - XDG_CACHE_HOME=/var/mkdocs/cache
+
     volumes:
+      # your repo (read-only) – MkDocs reads docs/ and mkdocs.yml from here
       - ../:/work:ro
+      # where the built site lives (useful to inspect from docker exec)
       - docs_site:/var/mkdocs/site
+      # cache to speed up rebuilds
       - docs_cache:/var/mkdocs/cache
+
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080 >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/ >/dev/null 2>&1 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
