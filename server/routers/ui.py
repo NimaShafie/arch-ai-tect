@@ -1,20 +1,26 @@
 # server/routers/ui.py
 
+from pathlib import Path
+import shutil
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from slugify import slugify
 from sqlmodel import select
 
-from ..db import get_session
-from ..models import Project
-from ..schemas import ProjectCreate
-from ..services.mkdocs_nav import build_nav
+from server.db import get_session
+from server.models import Project
+from server.schemas import ProjectCreate
+from server.services.mkdocs_nav import build_nav
 
 # Local templates instance to avoid circular import with server.app
 templates = Jinja2Templates(directory="server/templates")
 
 router = APIRouter(tags=["ui"])
+
+# Base path to docs/ so we can clean up per-project folders on delete
+DOCS_ROOT = Path(__file__).resolve().parents[2] / "docs"
 
 
 # ---------------------------------------------------------------------
@@ -26,9 +32,6 @@ router = APIRouter(tags=["ui"])
 def ui_home(request: Request, session=Depends(get_session)):
     """
     GET /  -> Workbench dashboard (project list)
-
-    This is what you currently see at https://workbench.shafie.org/
-    because the app mounts this router at the root with no prefix.
     """
     projects = session.exec(
         select(Project).order_by(Project.created_at.desc())
@@ -47,9 +50,6 @@ def ui_home(request: Request, session=Depends(get_session)):
 def ui_project(slug: str, request: Request, session=Depends(get_session)):
     """
     GET /ui/{slug}  -> Project detail page (e.g., /ui/disney-ai-v3)
-
-    IMPORTANT: We put the `/ui/` part *inside* the path here,
-    because the router is currently included with NO prefix.
     """
     project = session.exec(
         select(Project).where(Project.slug == slug)
@@ -76,7 +76,7 @@ def ui_project(slug: str, request: Request, session=Depends(get_session)):
 
 
 # ---------------------------------------------------------------------
-# JSON API ROUTES (used by the UI JS)
+# JSON API ROUTES (used by the UI JS on /ui)
 # ---------------------------------------------------------------------
 
 
@@ -146,15 +146,10 @@ def api_create_project(payload: ProjectCreate, session=Depends(get_session)):
     session.commit()
     session.refresh(project)
 
-    # Optional: trigger any nav regeneration / manifest updates that
-    # rely only on the DB + docs tree. If build_nav() has side-effects
-    # (like writing _generated_projects_nav.yml), this will keep
-    # mkdocs in sync without hard-coding slugs.
+    # Optional: regenerate nav; failures here should NOT break project creation.
     try:
         build_nav()
     except Exception:
-        # Don't fail project creation if nav regeneration blows up;
-        # the docs site can be rebuilt separately.
         pass
 
     return {
@@ -164,3 +159,45 @@ def api_create_project(payload: ProjectCreate, session=Depends(get_session)):
         "name": project.name,
         "nav_title": project.nav_title,
     }
+
+
+@router.delete("/api/projects/{slug}")
+def api_delete_project(slug: str, session=Depends(get_session)):
+    """
+    DELETE /api/projects/{slug} -> delete a project.
+
+    This is what the "Delete" button on the dashboard calls.
+
+    Behaviour:
+    - 404 if the slug doesn't exist.
+    - On success, removes the DB row.
+    - Best-effort removal of docs/projects/<slug> (ignored if missing).
+    - Best-effort nav regeneration.
+    """
+    project = session.exec(
+        select(Project).where(Project.slug == slug)
+    ).first()
+
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # Delete from DB
+    session.delete(project)
+    session.commit()
+
+    # Best-effort: remove docs/projects/<slug> directory
+    try:
+        proj_dir = DOCS_ROOT / "projects" / slug
+        if proj_dir.is_dir():
+            shutil.rmtree(proj_dir)
+    except Exception:
+        # Don't block deletion on filesystem issues
+        pass
+
+    # Best-effort: regenerate MkDocs nav
+    try:
+        build_nav()
+    except Exception:
+        pass
+
+    return {"status": "ok", "slug": slug}

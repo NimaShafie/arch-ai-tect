@@ -1,80 +1,116 @@
 # server/routers/brief.py
 
+from __future__ import annotations
+
 import json
 from pathlib import Path
+from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlmodel import select
 
-# Reuse the OpenWebUI integration & response-normalization logic
-from .brief_ai import _call_openwebui, _extract_brief_from_response
+from server.db import get_session
+from server.models import Project
+from server.services.files import ensure_project_tree
 
-router = APIRouter()
+router = APIRouter(
+    prefix="/api/projects",
+    tags=["brief"],
+)
 
-
-class BriefInterpretRequest(BaseModel):
-    prompt: str
-
-
-class BriefSaveRequest(BaseModel):
-    brief: dict
+DOCS_ROOT = Path("docs/projects")
 
 
-@router.post("/projects/{slug}/brief/interpret")
-async def interpret_brief(slug: str, body: BriefInterpretRequest):
+class BriefPayload(BaseModel):
+    brief: Dict[str, Any]
+
+
+def _get_project_or_404(slug: str, session) -> Project:
     """
-    Calls the AI backend (OpenWebUI) to interpret the natural-language
-    prompt and produce structured brief.json for this project.
-
-    This keeps the same URL shape as before:
-      POST /api/projects/{slug}/brief/interpret
-    (because app.py mounts this router under prefix="/api").
+    Fetch a Project by slug or raise HTTP 404.
+    Uses the same select(...) pattern as ui.py.
     """
-    # 1) Call OpenWebUI via the helper in brief_ai.py
-    data = await _call_openwebui(body.prompt)
+    project = session.exec(
+        select(Project).where(Project.slug == slug)
+    ).first()
 
-    # 2) Normalize into our "brief" shape
-    brief = _extract_brief_from_response(data)
+    if not project:
+        raise HTTPException(status_code=404, detail=f"Project '{slug}' not found")
 
-    # 3) Persist to docs tree so MkDocs & the UI can read it
-    path = Path(f"docs/projects/{slug}/brief.json")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(brief, indent=2))
-
-    return {"status": "ok", "brief": brief}
+    return project
 
 
-@router.post("/projects/{slug}/brief")
-async def save_brief(slug: str, body: BriefSaveRequest):
+def _brief_path(slug: str) -> Path:
+    """Return docs/projects/{slug}/brief.json."""
+    return DOCS_ROOT / slug / "brief.json"
+
+
+@router.get("/{slug}/brief")
+def get_brief(
+    slug: str,
+    session=Depends(get_session),
+) -> Dict[str, Optional[Dict[str, Any]]]:
     """
-    Saves manually edited brief.json from the UI.
+    GET /api/projects/{slug}/brief
 
-    URL: POST /api/projects/{slug}/brief
+    Returns:
+        { "brief": {...} }  if the file exists
+        { "brief": null }   if it does not (no 404 in that case)
     """
-    path = Path(f"docs/projects/{slug}/brief.json")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(body.brief, indent=2))
+    _get_project_or_404(slug, session)
 
-    return {"status": "saved"}
-
-
-@router.get("/projects/{slug}/brief")
-async def get_brief(slug: str):
-    """
-    Returns the current brief.json if it exists.
-
-    URL: GET /api/projects/{slug}/brief
-    """
-    path = Path(f"docs/projects/{slug}/brief.json")
+    path = _brief_path(slug)
     if not path.exists():
-        return {"brief": {}}
+        return {"brief": None}
 
     try:
-        data = json.loads(path.read_text())
-    except json.JSONDecodeError as exc:
+        raw = path.read_text(encoding="utf-8")
+        data = json.loads(raw) if raw.strip() else {}
+    except Exception as exc:
         raise HTTPException(
             status_code=500,
-            detail=f"Invalid brief.json for project '{slug}': {exc}",
-        )
+            detail=f"Failed to read brief for project '{slug}': {exc}",
+        ) from exc
 
     return {"brief": data}
+
+
+@router.post("/{slug}/brief")
+def save_brief(
+    slug: str,
+    payload: BriefPayload,
+    session=Depends(get_session),
+) -> Dict[str, Any]:
+    """
+    POST /api/projects/{slug}/brief
+
+    Body:
+        { "brief": { ... } }
+
+    Creates or overwrites docs/projects/{slug}/brief.json.
+    """
+    project = _get_project_or_404(slug, session)
+
+    # Ensure docs tree is present for this project.
+    try:
+        ensure_project_tree(project.slug, project.name)
+    except TypeError:
+        # In case ensure_project_tree(slug) is the current signature.
+        ensure_project_tree(project.slug)
+
+    path = _brief_path(slug)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        path.write_text(
+            json.dumps(payload.brief, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to save brief for project '{slug}': {exc}",
+        ) from exc
+
+    return {"status": "ok"}

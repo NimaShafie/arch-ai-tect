@@ -11,6 +11,8 @@
       position: relative;
       pointer-events: none;
       opacity: 0.8;
+      /* extra padding so the spinner never collides with the label text */
+      padding-right: 30px !important;
     }
     .btn-busy::after {
       content: "";
@@ -325,6 +327,9 @@ function showToast(message, type) {
   setTimeout(() => el.remove(), 3400);
 }
 
+// track whether we've successfully saved at least once
+let hasSavedBrief = false;
+
 // Load existing brief.json into the editor on page load
 (async () => {
   try {
@@ -334,6 +339,7 @@ function showToast(message, type) {
     if (data.brief) {
       document.querySelector("#briefJson").value =
         JSON.stringify(data.brief, null, 2);
+      hasSavedBrief = true;
     }
   } catch (err) {
     console.error("Failed to load brief:", err);
@@ -424,6 +430,7 @@ document.querySelector("#saveBriefBtn").addEventListener("click", async () => {
     });
 
     if (!r.ok) throw new Error(`Failed to save brief (HTTP ${r.status}).`);
+    hasSavedBrief = true;
     showToast("Brief saved.", "success");
   } catch (err) {
     console.error(err);
@@ -447,8 +454,9 @@ document.querySelector("#generateBtn").addEventListener("click", async (e) => {
     return;
   }
 
+  let parsedBrief;
   try {
-    JSON.parse(briefText);
+    parsedBrief = JSON.parse(briefText);
   } catch (err) {
     status.textContent =
       "The Generated Brief is not valid JSON. Fix it or click 'Interpret with AI' again before generating diagrams.";
@@ -465,8 +473,16 @@ document.querySelector("#generateBtn").addEventListener("click", async (e) => {
     return;
   }
 
-  status.textContent = "Generating diagrams…";
+  // Require that the brief has been saved at least once to avoid
+  // backend "brief.json not found" errors.
+  if (!hasSavedBrief) {
+    status.textContent =
+      "Please click 'Save Brief' first. This writes brief.json for this project so generation can use it.";
+    return;
+  }
+
   btn.classList.add("btn-busy");
+  status.textContent = "Generating diagrams…";
 
   try {
     const r = await fetch("/api/projects/{{ project.slug }}/generate", {
