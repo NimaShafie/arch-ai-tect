@@ -1,3 +1,3 @@
 # Projects
 
-- [Disney Ai V3](./disney-ai-v3/index.md)
+- [Disney+ Authorization System](./disney-ai-v3/index.md)

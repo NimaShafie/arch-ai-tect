@@ -5,19 +5,74 @@
 {% block content %}
 <div class="shell" style="padding-bottom:60px;">
 
+  <!-- Lightweight spinner + toast styles (no layout changes) -->
+  <style>
+    .btn-busy {
+      position: relative;
+      pointer-events: none;
+      opacity: 0.8;
+    }
+    .btn-busy::after {
+      content: "";
+      position: absolute;
+      right: 10px;
+      width: 14px;
+      height: 14px;
+      border-radius: 999px;
+      border: 2px solid rgba(255,255,255,0.45);
+      border-top-color: #ffffff;
+      animation: ui-spin 0.6s linear infinite;
+    }
+    @keyframes ui-spin {
+      to { transform: rotate(360deg); }
+    }
+
+    #toastRoot {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 8px;
+    }
+    .toast {
+      background: #111827;
+      color: #f9fafb;
+      padding: 8px 12px;
+      border-radius: 8px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+      font-size: 13px;
+      max-width: 280px;
+      transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+    .toast-success { background: #065f46; }
+    .toast-error { background: #991b1b; }
+  </style>
+
+  <!-- Toast container -->
+  <div id="toastRoot"></div>
+
   <!-- Header -->
   <div style="margin-bottom:20px;">
     <h1 class="h1" style="margin-bottom:4px;">{{ project.name }}</h1>
     <p class="muted" style="margin-bottom:16px;">Project workspace for {{ project.slug }}</p>
 
-    <!-- Docs pill nav -->
+    <!-- Docs pill nav (now points to docs.shafie.org) -->
     <div style="display:flex; flex-wrap:wrap; gap:8px;">
-      <a href="{{ docs_base }}/projects/{{ project.slug }}/" target="_blank" class="btn pill">Project Docs Home</a>
-      <a href="{{ docs_base }}/projects/{{ project.slug }}/package/spec/" target="_blank" class="btn pill">Spec</a>
-      <a href="{{ docs_base }}/projects/{{ project.slug }}/package/srs/" target="_blank" class="btn pill">SRS</a>
-      <a href="{{ docs_base }}/projects/{{ project.slug }}/package/reference-arch/" target="_blank" class="btn pill">Reference Architecture</a>
-      <a href="{{ docs_base }}/projects/{{ project.slug }}/package/implementation-guide/" target="_blank" class="btn pill">Implementation Guide</a>
-      <a href="{{ docs_base }}/projects/{{ project.slug }}/diagrams/" target="_blank" class="btn pill">Diagrams</a>
+      <a href="https://docs.shafie.org/projects/{{ project.slug }}/"
+         target="_blank" class="btn pill">Project Docs Home</a>
+      <a href="https://docs.shafie.org/projects/{{ project.slug }}/package/spec/"
+         target="_blank" class="btn pill">Spec</a>
+      <a href="https://docs.shafie.org/projects/{{ project.slug }}/package/srs/"
+         target="_blank" class="btn pill">SRS</a>
+      <a href="https://docs.shafie.org/projects/{{ project.slug }}/package/reference-arch/"
+         target="_blank" class="btn pill">Reference Architecture</a>
+      <a href="https://docs.shafie.org/projects/{{ project.slug }}/package/implementation-guide/"
+         target="_blank" class="btn pill">Implementation Guide</a>
+      <a href="https://docs.shafie.org/projects/{{ project.slug }}/diagrams/"
+         target="_blank" class="btn pill">Diagrams</a>
     </div>
   </div>
 
@@ -112,7 +167,6 @@
             Select which architectural diagrams to generate based on the Requirements Brief.
           </p>
 
-          <!-- Tile styles copied/adapted from previous implementation (style only) -->
           <style>
             #choices .fields {
               display: grid;
@@ -233,7 +287,7 @@
           </p>
 
           <a
-            href="{{ docs_base }}/projects/{{ project.slug }}/"
+            href="https://docs.shafie.org/projects/{{ project.slug }}/"
             target="_blank"
             class="btn"
             style="display:inline-flex; align-items:center; justify-content:center; padding:9px 18px;"
@@ -250,6 +304,27 @@
 </div>
 
 <script>
+// Toast helper
+const toastRoot = document.querySelector("#toastRoot");
+function showToast(message, type) {
+  if (!toastRoot) return;
+  const el = document.createElement("div");
+  el.className = "toast" + (type === "error" ? " toast-error" :
+                            type === "success" ? " toast-success" : "");
+  el.textContent = message;
+  toastRoot.appendChild(el);
+  // animate out
+  requestAnimationFrame(() => {
+    el.style.opacity = "1";
+    el.style.transform = "translateY(0)";
+  });
+  setTimeout(() => {
+    el.style.opacity = "0";
+    el.style.transform = "translateY(-4px)";
+  }, 3000);
+  setTimeout(() => el.remove(), 3400);
+}
+
 // Load existing brief.json into the editor on page load
 (async () => {
   try {
@@ -267,14 +342,17 @@
 
 // Interpret Requirements with AI
 document.querySelector("#interpretBtn").addEventListener("click", async () => {
+  const btn = document.querySelector("#interpretBtn");
   const prompt = document.querySelector("#briefPrompt").value.trim();
+  const status = document.querySelector("#interpretStatus");
+
   if (!prompt) {
-    alert("Enter a prompt first.");
+    status.textContent = "Enter a prompt first.";
     return;
   }
 
-  const status = document.querySelector("#interpretStatus");
-  status.textContent = "Interpreting with AI...";
+  status.textContent = "Interpreting with AI…";
+  btn.classList.add("btn-busy");
 
   try {
     const r = await fetch("/api/projects/{{ project.slug }}/brief/interpret", {
@@ -293,23 +371,17 @@ document.querySelector("#interpretBtn").addEventListener("click", async () => {
       }
       detail = data.detail || "";
     } else {
-      // Plain text / HTML error body (e.g., 404 HTML page)
       const text = await r.text().catch(() => "");
       detail = text ? text.slice(0, 140) + (text.length > 140 ? "…" : "") : "";
     }
 
     if (!r.ok) {
       let hint = "";
-      if (r.status === 404) {
-        hint = "The AI interpretation endpoint was not found. " +
-               "This usually means the backend API for AI is disabled or not deployed. " +
-               "Verify that the server is running the version with /brief/interpret configured " +
-               "and that it can reach your OpenWebUI model.";
-      } else if (r.status >= 500) {
-        hint = "The AI backend returned a server error. Check the API logs and your OpenWebUI / Cloudflare setup.";
+      if (r.status >= 500) {
+        hint = " The AI backend returned a server error. Check the API logs and your OpenWebUI / Cloudflare setup.";
       }
       throw new Error(
-        `HTTP ${r.status}. ${detail || ""} ${hint}`.trim()
+        `HTTP ${r.status}. ${detail || ""}${hint}`.trim()
       );
     }
 
@@ -317,27 +389,34 @@ document.querySelector("#interpretBtn").addEventListener("click", async () => {
   } catch (err) {
     console.error(err);
     status.textContent = "Error calling AI: " + err.message;
+  } finally {
+    btn.classList.remove("btn-busy");
   }
 });
 
-// Save brief.json
+// Save brief.json (with toast instead of alert)
 document.querySelector("#saveBriefBtn").addEventListener("click", async () => {
+  const btn = document.querySelector("#saveBriefBtn");
+  const text = document.querySelector("#briefJson").value;
+  const trimmed = text.trim();
+
+  if (!trimmed) {
+    showToast("Nothing to save yet. Use 'Interpret with AI' first or paste a brief JSON.", "error");
+    return;
+  }
+
+  let parsed;
   try {
-    const text = document.querySelector("#briefJson").value;
-    const trimmed = text.trim();
-    if (!trimmed) {
-      alert("Nothing to save yet. Use 'Interpret with AI' first or paste a brief JSON.");
-      return;
-    }
+    parsed = JSON.parse(trimmed);
+  } catch (e) {
+    showToast("The Generated Brief is not valid JSON. Fix it or re-run 'Interpret with AI'.", "error");
+    console.error(e);
+    return;
+  }
 
-    let parsed;
-    try {
-      parsed = JSON.parse(trimmed);
-    } catch (e) {
-      alert("The Generated Brief is not valid JSON. Fix it or re-run 'Interpret with AI'.\n\n" + e.message);
-      return;
-    }
+  btn.classList.add("btn-busy");
 
+  try {
     const r = await fetch("/api/projects/{{ project.slug }}/brief", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -345,16 +424,19 @@ document.querySelector("#saveBriefBtn").addEventListener("click", async () => {
     });
 
     if (!r.ok) throw new Error(`Failed to save brief (HTTP ${r.status}).`);
-    alert("Brief saved.");
+    showToast("Brief saved.", "success");
   } catch (err) {
     console.error(err);
-    alert("Save failed: " + err.message);
+    showToast("Save failed: " + err.message, "error");
+  } finally {
+    btn.classList.remove("btn-busy");
   }
 });
 
 // Generate diagrams
 document.querySelector("#generateBtn").addEventListener("click", async (e) => {
   e.preventDefault();
+  const btn = document.querySelector("#generateBtn");
   const status = document.querySelector("#genStatus");
   status.textContent = "";
 
@@ -383,13 +465,14 @@ document.querySelector("#generateBtn").addEventListener("click", async (e) => {
     return;
   }
 
-  status.textContent = "Generating diagrams...";
+  status.textContent = "Generating diagrams…";
+  btn.classList.add("btn-busy");
 
   try {
-    const r = await fetch("/ui/{{ project.slug }}/generate", {
+    const r = await fetch("/api/projects/{{ project.slug }}/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ choices })
+      body: JSON.stringify({ diagrams: choices })
     });
 
     const contentType = r.headers.get("content-type") || "";
@@ -410,15 +493,19 @@ document.querySelector("#generateBtn").addEventListener("click", async (e) => {
         throw new Error(
           `Diagram generation failed (HTTP ${r.status} ${r.statusText || ""}). ` +
           "The server returned a non-JSON response (likely an HTML error page). " +
-          "Check that the backend generation endpoint is reachable. "
+          "Check that the backend generation endpoint is reachable."
         );
       }
     }
 
-    status.textContent = "Generation complete. Open '3. View Output' ➜ 'View Documentation' to see the results.";
+    status.textContent = "Generation complete. Use 'View Documentation' to see the results.";
+    showToast("Diagrams generated. Check the docs site.", "success");
   } catch (err) {
     console.error(err);
     status.textContent = "Error during generation: " + err.message;
+    showToast("Generation failed: " + err.message, "error");
+  } finally {
+    btn.classList.remove("btn-busy");
   }
 });
 </script>

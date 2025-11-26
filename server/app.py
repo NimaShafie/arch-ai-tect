@@ -6,8 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from server.db import init_db
-from server.routers import brief, ui
-
+from server.routers import brief, brief_ai, ui, generate
 
 def create_app() -> FastAPI:
     app = FastAPI(title="ArchAiTect Workbench")
@@ -26,6 +25,8 @@ def create_app() -> FastAPI:
     app.include_router(ui.router)
     # brief API lives under /api/...
     app.include_router(brief.router, prefix="/api")
+    app.include_router(brief_ai.router)
+    app.include_router(generate.router)
 
     # Root → UI landing
     @app.get("/", include_in_schema=False)
