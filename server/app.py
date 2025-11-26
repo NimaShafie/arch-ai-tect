@@ -1,5 +1,7 @@
 # server/app.py
 
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -7,6 +9,7 @@ from fastapi.templating import Jinja2Templates
 
 from server.db import init_db
 from server.routers import brief, brief_ai, ui, generate
+
 
 def create_app() -> FastAPI:
     app = FastAPI(title="ArchAiTect Workbench")
@@ -17,22 +20,29 @@ def create_app() -> FastAPI:
     # Templates
     app.templates = Jinja2Templates(directory="server/templates")
 
-    # Static files (CSS, JS, etc.)
-    app.mount("/static", StaticFiles(directory="server/static"), name="static")
+    # Static assets (optional)
+    #
+    # Only mount /assets if the directory actually exists to avoid
+    # crashing the whole app when running on a fresh checkout or a
+    # server that doesn't ship front-end assets.
+    assets_dir = Path(__file__).parent / "assets"
+    if assets_dir.exists():
+        app.mount(
+            "/assets",
+            StaticFiles(directory=str(assets_dir)),
+            name="assets",
+        )
 
-    # Routers
-    # ui router already defines /ui and /ui/{slug}
-    app.include_router(ui.router)
-    # brief API lives under /api/...
-    app.include_router(brief.router, prefix="/api")
+    # UI + API routers
+    app.include_router(ui.router)        # Workbench HTML + JSON API
+    app.include_router(brief.router)
     app.include_router(brief_ai.router)
     app.include_router(generate.router)
 
-    # Root → UI landing
+    # Root redirect to /ui
     @app.get("/", include_in_schema=False)
     async def root():
-        # just bounce to /ui; ui_root will pick the first project
-        return RedirectResponse(url="/ui", status_code=307)
+        return RedirectResponse(url="/ui")
 
     return app
 
