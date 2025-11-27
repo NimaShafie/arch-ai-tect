@@ -1,0 +1,10 @@
+# docs/requirements.txt
+
+mkdocs
+mkdocs-material
+mkdocs-material-extensions
+mkdocs-macros-plugin
+mkdocs-exclude
+mkdocs-monorepo-plugin
+mkdocs-awesome-pages-plugin
+mkdocs-kroki-plugin
