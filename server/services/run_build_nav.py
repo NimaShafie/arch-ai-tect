@@ -85,6 +85,133 @@ _PLANTUML_BLOCK_RE = re.compile(
 )
 
 
+# --- Heading / body utilities -------------------------------------------------
+
+_SECTION_HEADINGS = {
+    "Summary",
+    "Context",
+    "Actors",
+    "Key Scenarios",
+    "Overview",
+    "Next Steps",
+}
+
+
+def _normalize_internal_headings(text: str) -> str:
+    """
+    For internal headings like 'Summary', 'Context', etc., standardize their
+    size to match the 'Diagrams' heading (###) and insert a horizontal rule
+    before them for extra separation.
+    """
+    def repl(match: re.Match) -> str:
+        hashes = match.group(1)
+        title = match.group(2).strip()
+        if title in _SECTION_HEADINGS:
+            # Add separator and normalize to ### <Title>
+            return f"---\n\n### {title}"
+        return match.group(0)
+
+    pattern = re.compile(r"^(#+)\s+(.*)\s*$", re.MULTILINE)
+    return pattern.sub(repl, text)
+
+
+def _generate_requirements_from_plantuml(code: str, section_title: str | None) -> str:
+    """
+    Extract a rich, software-requirements-style description from the PlantUML
+    text. The result is returned as a heading followed by a fenced
+    ```markdown``` block so it renders in a 'markdown box' on the page.
+    Inside the block we keep plain text (no markdown formatting).
+    """
+    bullets: list[str] = []
+
+    lines = [ln.strip() for ln in code.splitlines()]
+    for ln in lines:
+        if not ln or ln.startswith("'"):
+            continue
+        if ln.lower().startswith("@startuml") or ln.lower().startswith("@enduml"):
+            continue
+        if ln.startswith("!"):
+            continue
+
+        # Sequence-style message: A -> B : message
+        m = re.match(r"(\w+)\s*[-\.]+>\s*(\w+)\s*:(.+)", ln)
+        if m:
+            src, dst, msg = m.group(1), m.group(2), m.group(3).strip()
+            bullets.append(
+                f"- The system shall support an interaction where {src} sends "
+                f"the message '{msg}' to {dst}, and the platform must be able "
+                f"to process this exchange end-to-end."
+            )
+            continue
+
+        # C4 relationship: Rel(a, b, "Uses")
+        m = re.match(r"Rel\(([^,]+),\s*([^,]+),\s*\"([^\"]+)\"", ln)
+        if m:
+            a, b, rel = (p.strip() for p in m.groups())
+            bullets.append(
+                f"- The architecture shall include a relationship where "
+                f"{a} {rel.lower()} {b}, and this connection must be "
+                f"implemented with appropriate protocols, security, and error handling."
+            )
+            continue
+
+        # C4 element definitions: Person/System/Container/Component(...)
+        m = re.match(
+            r"(Person|System|Container|Component)\(([^,]+),\s*\"([^\"]+)\"(?:,\s*\"([^\"]+)\")?",
+            ln,
+        )
+        if m:
+            kind, ident, name, desc = m.groups()
+            desc_part = f" ({desc})" if desc else ""
+            bullets.append(
+                f"- The design shall define a {kind.lower()} {ident} named "
+                f"{name}{desc_part}, and implementation work must provision it "
+                f"as a distinct deployable or conceptual element."
+            )
+            continue
+
+        # Generic deployment / structural elements:
+        # node "Cloud Region" as cloud, database "db" as db, component "WebApp" as web, etc.
+        m = re.match(
+            r"(node|database|artifact|component|rectangle|queue|cloud|storage)\s+\"([^\"]+)\"\s+as\s+(\w+)",
+            ln,
+            re.IGNORECASE,
+        )
+        if m:
+            kind, name, alias = m.groups()
+            bullets.append(
+                f"- The deployment model shall include a {kind.lower()} "
+                f"{alias} representing {name}, and infrastructure tasks must "
+                f"ensure it is provisioned, monitored, and reachable by its peers."
+            )
+            continue
+
+    # If we still didn't extract anything, provide a generic but useful description
+    if not bullets:
+        title = section_title or "this diagram"
+        bullets.append(
+            f"- This diagram defines the primary elements and relationships for {title}, "
+            f"and implementation must ensure that all shown components, connections, and "
+            f"responsibilities are realized in code, configuration, and infrastructure."
+        )
+        bullets.append(
+            "- The development team shall treat each visual element as either a deployable "
+            "artifact, a runtime capability, or an integration point, and create tasks to "
+            "build, configure, and test each of them."
+        )
+        bullets.append(
+            "- Non-functional requirements (performance, security, observability, "
+            "resilience) must be applied to all links and components shown in the diagram."
+        )
+
+    heading = "#### Requirements derived from this diagram"
+    if section_title:
+        heading = f"#### Requirements for {section_title}"
+
+    body = "\n".join(bullets)
+    return f"{heading}\n\n```markdown\n{body}\n```"
+
+
 def _inject_plantuml_link(body: str, section_title: str | None = None) -> str:
     """
     If the body contains a PlantUML code block, compute the encoded URL and
@@ -92,10 +219,10 @@ def _inject_plantuml_link(body: str, section_title: str | None = None) -> str:
         - 'Open in PlantUML' link (HTML viewer)
         - the PNG image rendered by the PlantUML server
         - a collapsible <details> block wrapping the original source
+        - a requirements-style markdown box under the source
 
     The original fenced block is left intact so Kroki / MkDocs plugins can
-    still render as before. We only wrap it in <details> so the source appears
-    in a smaller, collapsible box.
+    still render as before.
     """
     match = _PLANTUML_BLOCK_RE.search(body)
     if not match:
@@ -117,14 +244,16 @@ def _inject_plantuml_link(body: str, section_title: str | None = None) -> str:
     alt_label = section_title or "Diagram"
     alt_label = alt_label.strip()
 
-    # Wrap the existing body (including the fenced code block) in <details>
+    requirements_md = _generate_requirements_from_plantuml(code, section_title)
+
     wrapped_body = (
         f"{link_line}\n\n"
         f"![{alt_label}]({png_url})\n\n"
         "<details>\n"
         "<summary>Show PlantUML source</summary>\n\n"
         f"{body}\n\n"
-        "</details>"
+        "</details>\n\n"
+        f"{requirements_md}\n"
     )
 
     return wrapped_body
@@ -137,9 +266,9 @@ def _read_without_leading_title(path: Path) -> str:
     """
     Read a markdown file and strip a single leading ATX heading line
     (e.g. '# Architecture Spec') so that we can inject our own
-    '### Architecture Spec' heading in the combined page.
+    '#### Architecture Spec' heading in the combined page.
 
-    If no heading is found on the first line, return the content as-is.
+    Also normalizes some internal headings and separators for better layout.
     """
     text = path.read_text(encoding="utf-8")
     lines = text.splitlines()
@@ -150,7 +279,13 @@ def _read_without_leading_title(path: Path) -> str:
         while lines and not lines[0].strip():
             lines = lines[1:]
 
-    return "\n".join(lines).strip()
+    text = "\n".join(lines).strip()
+    if not text:
+        return ""
+
+    # Normalize internal headings like Summary, Context, etc.
+    text = _normalize_internal_headings(text)
+    return text
 
 
 def build_project_indexes() -> None:
@@ -163,7 +298,8 @@ def build_project_indexes() -> None:
       - Sections       -> ### (Package, Diagrams)
       - Subsections    -> #### (each spec/diagram)
 
-    A 'Back to top' link is appended at the bottom.
+    A 'Back to top' link is appended at the bottom. Horizontal rules are used
+    throughout to clearly separate sections and diagrams.
     """
     if not PROJECTS_ROOT.exists():
         print(f"[build_project_indexes] No {PROJECTS_ROOT} directory, skipping.")
@@ -200,20 +336,33 @@ def build_project_indexes() -> None:
         lines.append("")
 
         package_root = project_dir / "package"
+        seen_package_bodies: set[str] = set()
+
         for section_title, filename in PACKAGE_FILES:
             src = package_root / filename
             if not src.exists():
                 continue
 
+            body = _read_without_leading_title(src)
+            if not body:
+                continue
+
+            # Skip duplicate sections with identical bodies (avoids repeated
+            # stub content like identical summaries across spec/SRS).
+            body_key = body.strip()
+            if body_key in seen_package_bodies:
+                continue
+            seen_package_bodies.add(body_key)
+
             lines.append(f"#### {section_title}")
             lines.append("")
+            lines.append(body)
+            lines.append("")
+            # Separator after each package section
+            lines.append("---")
+            lines.append("")
 
-            body = _read_without_leading_title(src)
-            if body:
-                lines.append(body)
-                lines.append("")
-
-        # visual separation between sections
+        # visual separation between package and diagrams
         lines.append("---")
         lines.append("")
 
@@ -227,19 +376,22 @@ def build_project_indexes() -> None:
             if not src.exists():
                 continue
 
+            body = _read_without_leading_title(src)
+            if not body:
+                continue
+
             lines.append(f"#### {section_title}")
             lines.append("")
 
-            body = _read_without_leading_title(src)
-            if body:
-                # Add PlantUML link + PNG image + collapsible source,
-                # while keeping original fenced block intact.
-                body = _inject_plantuml_link(body, section_title)
-                lines.append(body)
-                lines.append("")
-                # EXTRA SEPARATOR between diagrams for visual clarity
-                lines.append("---")
-                lines.append("")
+            # Add PlantUML link + PNG image + collapsible source +
+            # rich requirements markdown box, while keeping original fenced
+            # block intact.
+            body = _inject_plantuml_link(body, section_title)
+            lines.append(body)
+            lines.append("")
+            # EXTRA SEPARATOR between diagrams for visual clarity
+            lines.append("---")
+            lines.append("")
 
         # Back to top link at the very end
         lines.append("[Back to top](#top)")
