@@ -1,0 +1,46 @@
+{# docs/overrides/partials/header.html #}
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="{{ config.site_name }}">
+
+    {# Logo on the left – links to the site root #}
+    <a href="{{ config.site_url | default('/', true) }}"
+       title="{{ config.site_name | e }}"
+       class="md-header__button md-logo"
+       aria-label="{{ config.site_name | e }}">
+      {% include "partials/logo.html" %}
+    </a>
+
+    {# Title + top-level nav (Home / Projects) grouped together #}
+    <div class="aw-header-group" data-md-component="header-title">
+      <div class="md-header__title">
+        <span class="md-header__topic md-ellipsis">
+          {{ config.site_name }}
+        </span>
+      </div>
+
+      {# Our simple primary nav: iterate top-level items in `nav` #}
+      {% if nav %}
+      <nav class="aw-header-nav" aria-label="Primary navigation">
+        {% for item in nav %}
+          {% if item.url %}
+            <a href="{{ item.url | url }}"
+               class="md-tabs__link{% if item.active %} md-tabs__link--active{% endif %}">
+              {{ item.title }}
+            </a>
+          {% endif %}
+        {% endfor %}
+      </nav>
+      {% endif %}
+    </div>
+
+    {# Search button + dialog on the right (unchanged) #}
+    {% if "search" in config.plugins %}
+      <label class="md-header__button md-icon" for="__search">
+        {% include "partials/icons/search.html" %}
+      </label>
+      {% include "partials/search.html" %}
+    {% endif %}
+
+  </nav>
+</header>

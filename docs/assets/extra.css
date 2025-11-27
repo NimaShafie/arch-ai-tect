@@ -1,13 +1,7 @@
-/* docs/assets/extra.css */
+/* docs/assets/extra.css
+ *
+ * Keep this file for small visual tweaks only.
+ * Layout is handled by the default Material theme.
+ */
 
-/* Hide the primary (left) sidebar, but keep the right-hand TOC */
-.md-sidebar--primary {
-  display: none;
-}
-
-/* Let the main content use more horizontal space */
-.md-main__inner {
-  margin-left: auto;
-  margin-right: auto;
-  max-width: 1100px;
-}
+/* (intentionally left minimal – no header/side-nav overrides) */

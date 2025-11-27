@@ -5,8 +5,8 @@ theme:
   features:
   - content.code.copy
   - content.tabs.link
-  - navigation.tabs
-  - navigation.top
+  - search.suggest
+  - search.highlight
 nav:
 - Home: index.md
 - Projects: projects/index.md
@@ -15,7 +15,7 @@ markdown_extensions:
 - def_list
 - footnotes
 - toc:
-    permalink: true
+    permalink: false
 - pymdownx.details
 - pymdownx.superfences
 - pymdownx.highlight

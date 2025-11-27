@@ -15,155 +15,145 @@ GENERATED_YAML = DOCS_ROOT / "_generated_projects_nav.yml"
 MKDOCS_YML = Path("mkdocs.yml")
 
 
+# -------------------------------------------------------------------
+# Ensure project docs directory exists
+# -------------------------------------------------------------------
+
 def _ensure_docs_root() -> None:
-    """Ensure docs/projects exists."""
     PROJECTS_ROOT.mkdir(parents=True, exist_ok=True)
 
 
-def _write_projects_index(projects: List[Project]) -> None:
-    """
-    Regenerate docs/projects/index.md from the DB.
+# -------------------------------------------------------------------
+# RENDER: Projects Index Page (rich layout – correct, non-indented)
+# -------------------------------------------------------------------
 
-    This is what you see at https://docs.shafie.org/projects/.
-    No project names or slugs are hard-coded here; everything
-    comes from the Project rows.
-    """
-    lines: List[str] = [
-        "# Projects",
-        "",
-        "Architecture workspaces managed by the **ArchAiTect Workbench**.",
-        "",
-        "Use this page as the hub to jump into each project's package docs and diagrams.",
-        "",
-    ]
+def _render_projects_index(projects: List[Project]) -> str:
+    """Render a clean, non-indented Markdown Projects page."""
 
     if not projects:
-        lines.append("_No projects have been created yet via the Workbench UI._")
-    else:
-        for p in projects:
-            title = (p.nav_title or p.name).strip() if getattr(p, "nav_title", None) else p.name
-            slug = p.slug
-            created = (
-                p.created_at.date().isoformat()
-                if getattr(p, "created_at", None)
-                else "—"
-            )
-            summary = (
-                p.summary.strip()
-                if getattr(p, "summary", None)
-                else "Architecture workspace managed by the ArchAiTect Workbench."
-            )
+        return (
+            "# Projects\n\n"
+            "_No projects have been created yet via the Workbench UI._\n"
+        )
 
-            lines += [
-                "---",
-                "",
-                f"### [{title}](./{slug}/index.md)",
-                "",
-                f"**Created:** {created}  ",
-                f"**Slug:** `{slug}`  ",
-                f"**Summary:** {summary}",
-                "",
-                "| Category | Links |",
-                "| --- | --- |",
-                (
-                    f"| Package docs | "
-                    f"[Spec](./{slug}/package/spec.md) · "
-                    f"[SRS](./{slug}/package/srs.md) · "
-                    f"[Ref Arch](./{slug}/package/reference-arch.md) · "
-                    f"[Impl Guide](./{slug}/package/implementation-guide.md) |"
-                ),
-                (
-                    f"| Diagrams | "
-                    f"[C4 Context](./{slug}/diagrams/c4_context.md) · "
-                    f"[C4 Container](./{slug}/diagrams/c4_container.md) · "
-                    f"[C4 Component](./{slug}/diagrams/c4_component.md) · "
-                    f"[Logical](./{slug}/diagrams/logical.md) · "
-                    f"[Deployment](./{slug}/diagrams/deployment.md) · "
-                    f"[Sequence](./{slug}/diagrams/sequence.md) |"
-                ),
-                "",
-            ]
+    # Jump list
+    jump_list = "\n".join(
+        f"- [{p.name}](/projects/{p.slug}/)"
+        for p in projects
+    )
 
-    lines.append("")
-    (PROJECTS_ROOT / "index.md").write_text("\n".join(lines), encoding="utf-8")
+    # Detailed sections for each project
+    sections: List[str] = []
+    for p in projects:
+        title = p.name
+        slug = p.slug
+        created = p.created_at.date().isoformat() if p.created_at else "—"
 
+        section_md = (
+            f"## [{title}](/projects/{slug}/)\n\n"
+            f"**Created:** {created}  \n"
+            f"**Slug:** `{slug}`  \n"
+            f"**Summary:** Architecture workspace managed by the ArchAiTect Workbench.\n\n"
+            "| Category     | Links |\n"
+            "| ------------ | ----- |\n"
+            f"| Package docs | [Spec](/projects/{slug}/package/spec.md) · "
+            f"[SRS](/projects/{slug}/package/srs.md) · "
+            f"[Ref Arch](/projects/{slug}/package/reference-arch.md) · "
+            f"[Impl Guide](/projects/{slug}/package/implementation-guide.md) |\n"
+            f"| Diagrams     | [C4 Context](/projects/{slug}/diagrams/c4_context.md) · "
+            f"[C4 Container](/projects/{slug}/diagrams/c4_container.md) · "
+            f"[C4 Component](/projects/{slug}/diagrams/c4_component.md) · "
+            f"[Logical](/projects/{slug}/diagrams/logical.md) · "
+            f"[Deployment](/projects/{slug}/diagrams/deployment.md) · "
+            f"[Sequence](/projects/{slug}/diagrams/sequence.md) |\n"
+        )
+
+        sections.append(section_md)
+
+    # Join all project sections
+    sections_block = "\n\n---\n\n".join(sections)
+
+    # Build full page (NO indentation!)
+    final_md = (
+        "# Projects\n\n"
+        "These architecture projects are managed by the **ArchAiTect Workbench**.\n\n"
+        "Use this page as the hub to jump into each project's package docs and diagrams.\n\n"
+        "## Jump to a project\n\n"
+        f"{jump_list}\n\n"
+        "---\n\n"
+        f"{sections_block}\n"
+    )
+
+    return final_md
+
+
+# -------------------------------------------------------------------
+# WRITE: Projects index markdown file
+# -------------------------------------------------------------------
+
+def _write_projects_index(projects: List[Project]) -> None:
+    PROJECTS_ROOT.mkdir(parents=True, exist_ok=True)
+    markdown = _render_projects_index(projects)
+    (PROJECTS_ROOT / "index.md").write_text(markdown, encoding="utf-8")
+
+
+# -------------------------------------------------------------------
+# YAML generation for possible future use
+# -------------------------------------------------------------------
 
 def _write_generated_yaml(projects: List[Project]) -> None:
-    """
-    Write docs/_generated_projects_nav.yml so MkDocs macros
-    (if we ever want them) can list projects dynamically.
-    """
     payload: Dict[str, Any] = {
         "projects": [
             {
                 "slug": p.slug,
-                "title": (p.nav_title or p.name).strip()
-                if getattr(p, "nav_title", None)
-                else p.name,
+                "title": p.name,
                 "url": f"/projects/{p.slug}/",
             }
             for p in projects
         ]
     }
     GENERATED_YAML.write_text(
-        yaml.safe_dump(payload, sort_keys=False), encoding="utf-8"
+        yaml.safe_dump(payload, sort_keys=False),
+        encoding="utf-8"
     )
 
 
+# -------------------------------------------------------------------
+# Update mkdocs.yml navigation
+# -------------------------------------------------------------------
+
 def _update_mkdocs_nav(projects: List[Project]) -> None:
-    """
-    Rewrite the nav section of mkdocs.yml from the DB.
-
-    We now keep nav *very* simple and move navigation to the top bar:
-
-      - Home
-      - Projects  (just the overview page)
-
-    Individual projects are navigated from the Projects overview and the
-    right-hand Table of contents, not from the left sidebar.
-    """
     if not MKDOCS_YML.exists():
         return
 
     cfg = yaml.safe_load(MKDOCS_YML.read_text(encoding="utf-8")) or {}
 
-    # Primary nav only has Home and Projects
-    nav: List[Any] = [
+    cfg["nav"] = [
         {"Home": "index.md"},
         {"Projects": "projects/index.md"},
     ]
-    cfg["nav"] = nav
 
-    # Theme tweaks: tabs at the top, no "expand" sidebar behaviour
-    theme = cfg.get("theme") or {}
-    features = set(theme.get("features") or [])
+    MKDOCS_YML.write_text(
+        yaml.safe_dump(cfg, sort_keys=False),
+        encoding="utf-8"
+    )
 
-    # Top navigation tabs instead of left-hand tree
-    features.update({"navigation.tabs", "navigation.top"})
-    # We aren't using the expandable sidebar nav any more
-    features.discard("navigation.expand")
 
-    theme["features"] = sorted(features)
-    cfg["theme"] = theme
-
-    # Make sure the brand points to the public docs URL
-    # (this also makes the "ArchAiTect Workbench" title a link home)
-    cfg.setdefault("site_url", "https://docs.shafie.org/")
-
-    MKDOCS_YML.write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
-
+# -------------------------------------------------------------------
+# Main entry point
+# -------------------------------------------------------------------
 
 def build_nav() -> None:
     """
-    Main entry point: keep MkDocs in sync with the Workbench projects.
+    Sync MkDocs with Workbench state:
 
-    - Ensures docs/projects/ exists.
-    - Ensures docs/projects/<slug>/ exists and writes a standard index.md
-      for each project (idempotent, but will overwrite old generated content).
-    - Regenerates docs/projects/index.md with a compact overview.
-    - Writes docs/_generated_projects_nav.yml.
-    - Rewrites mkdocs.yml nav from the Project table.
+    - Ensures docs/projects/<slug>/ exists
+    - Creates stub index.md for each project (if missing)
+    - Regenerates the rich Projects landing page
+    - Updates mkdocs.yml nav
+    - Regenerates generated YAML
     """
+
     _ensure_docs_root()
 
     with get_session() as session:
@@ -171,38 +161,32 @@ def build_nav() -> None:
             session.exec(select(Project).order_by(Project.created_at.asc()))
         )
 
-    # Project detail pages: always rewrite to keep them consistent
+    # Ensure each project folder & stub page exists
     for p in projects:
         project_dir = PROJECTS_ROOT / p.slug
         project_dir.mkdir(parents=True, exist_ok=True)
 
         index_md = project_dir / "index.md"
-        title = (p.nav_title or p.name).strip() if getattr(p, "nav_title", None) else p.name
+        if not index_md.exists():
+            title = p.name
+            index_md.write_text(
+                f"# {title}\n\n"
+                "This is the architecture workspace for this project.\n\n"
+                "## Package\n\n"
+                "- [Architecture Spec](./package/spec.md)\n"
+                "- [Software Requirements Spec (SRS)](./package/srs.md)\n"
+                "- [Reference Architecture](./package/reference-arch.md)\n"
+                "- [Implementation Guide](./package/implementation-guide.md)\n\n"
+                "## Diagrams\n\n"
+                "- Diagrams are available under the `diagrams/` section of the docs.\n",
+                encoding="utf-8",
+            )
 
-        content_lines = [
-            f"# {title}",
-            "",
-            "This is the architecture workspace for this project.",
-            "",
-            "## Package",
-            "",
-            "- [Architecture Spec](./package/spec.md)",
-            "- [Software Requirements Spec (SRS)](./package/srs.md)",
-            "- [Reference Architecture](./package/reference-arch.md)",
-            "- [Implementation Guide](./package/implementation-guide.md)",
-            "",
-            "## Diagrams",
-            "",
-            "- [C4 Context](./diagrams/c4_context.md)",
-            "- [C4 Container](./diagrams/c4_container.md)",
-            "- [C4 Component](./diagrams/c4_component.md)",
-            "- [Logical View](./diagrams/logical.md)",
-            "- [Deployment View](./diagrams/deployment.md)",
-            "- [Sequence Diagram](./diagrams/sequence.md)",
-            "",
-        ]
-        index_md.write_text("\n".join(content_lines), encoding="utf-8")
-
+    # Regenerate full Projects page
     _write_projects_index(projects)
+
+    # Update helper YAML
     _write_generated_yaml(projects)
+
+    # Update mkdocs navigation
     _update_mkdocs_nav(projects)
