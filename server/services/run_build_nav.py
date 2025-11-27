@@ -119,6 +119,8 @@ def _normalize_internal_headings(text: str) -> str:
     return pattern.sub(repl, text)
 
 
+# --- PlantUML → requirements text --------------------------------------------
+
 def _generate_requirements_from_plantuml(code: str, section_title: str | None) -> str:
     """
     Extract a rich, software-requirements-style description from the PlantUML
@@ -215,8 +217,7 @@ def _generate_requirements_from_plantuml(code: str, section_title: str | None) -
 
     bullets_text = "\n".join(bullets)
 
-    # details panel (blue box) + inner markdown fence, so it both looks nice
-    # and stays pure markdown for copy/paste or downstream AI tools
+    # details panel (blue box) + inner markdown fence
     return (
         f'<details open>\n'
         f'<summary>{html.escape(summary)}</summary>\n\n'
@@ -224,6 +225,172 @@ def _generate_requirements_from_plantuml(code: str, section_title: str | None) -
         f'</details>'
     )
 
+
+# --- PlantUML → Mermaid helpers (kept for future export, not rendered) -------
+
+def _is_sequence_diagram(code: str) -> bool:
+    if "sequence diagram" in code.lower():
+        return True
+    if re.search(r"^\s*actor\b", code, re.MULTILINE):
+        return True
+    if re.search(r"^\s*participant\b", code, re.MULTILINE):
+        return True
+    return False
+
+
+def _plantuml_sequence_to_mermaid(code: str) -> str:
+    lines = [ln.strip() for ln in code.splitlines()]
+    actors: list[str] = []
+    participants: list[str] = []
+    messages: list[str] = []
+
+    for ln in lines:
+        if not ln or ln.startswith("'"):
+            continue
+        if ln.lower().startswith("@startuml") or ln.lower().startswith("@enduml"):
+            continue
+        if ln.startswith("!"):
+            continue
+
+        ma = re.match(r"actor\s+(\w+)", ln)
+        if ma:
+            name = ma.group(1)
+            if name not in actors:
+                actors.append(name)
+            continue
+
+        mp = re.match(r"participant\s+(\w+)", ln)
+        if mp:
+            name = mp.group(1)
+            if name not in participants:
+                participants.append(name)
+            continue
+
+        # message lines: A -> B : text   or A --> B : text
+        mm = re.match(r"(\w+)\s*([-\.]+)>\s*(\w+)\s*:(.+)", ln)
+        if mm:
+            src, arrow_raw, dst, msg = (
+                mm.group(1),
+                mm.group(2),
+                mm.group(3),
+                mm.group(4).strip(),
+            )
+            # map arrows: request vs response (very rough)
+            if "--" in arrow_raw:
+                arrow = "-->>"
+            else:
+                arrow = "->>"
+            messages.append(f"    {src}{arrow}{dst}: {msg}")
+            continue
+
+    if not actors and not participants and not messages:
+        return ""
+
+    out: list[str] = ["sequenceDiagram", ""]
+    for a in actors:
+        out.append(f"    actor {a}")
+    for p in participants:
+        out.append(f"    participant {p}")
+    if actors or participants:
+        out.append("")
+
+    out.extend(messages)
+    return "\n".join(out)
+
+
+def _plantuml_c4_to_mermaid(code: str) -> str:
+    """
+    Very small translator from your C4-style PlantUML into a Mermaid flowchart.
+    Intended for your current subset (Person/System/Container/Component + Rel).
+    """
+    lines = [ln.strip() for ln in code.splitlines()]
+    nodes: dict[str, str] = {}
+    edges: list[tuple[str, str, str]] = []
+
+    for ln in lines:
+        if not ln or ln.startswith("'"):
+            continue
+        if ln.lower().startswith("@startuml") or ln.lower().startswith("@enduml"):
+            continue
+        if ln.startswith("!"):
+            continue
+
+        # C4 elements
+        m = re.match(
+            r"(Person|System|Container|Component)\(([^,]+),\s*\"([^\"]+)\"(?:,\s*\"([^\"]+)\")?(?:,\s*\"([^\"]+)\")?",
+            ln,
+        )
+        if m:
+            kind, ident, name, tech_or_desc, desc2 = m.groups()
+            # try to produce a multi-line label
+            label_parts = [name]
+            if tech_or_desc:
+                label_parts.append(tech_or_desc)
+            if desc2:
+                label_parts.append(desc2)
+            label = "\\n".join(label_parts)
+            # make databases rounded, others rectangular
+            if "db" in ident.lower() or "database" in name.lower():
+                shape = f"{ident}[({label})]"
+            else:
+                shape = f"{ident}[{label}]"
+            nodes[ident] = shape
+            continue
+
+        # Relationships
+        r = re.match(r"Rel\(([^,]+),\s*([^,]+),\s*\"([^\"]+)\"", ln)
+        if r:
+            a, b, rel = (p.strip() for p in r.groups())
+            edges.append((a, b, rel))
+            continue
+
+        # deployment-ish nodes: node "Cloud Region" as cloud, etc.
+        d = re.match(
+            r"(node|database|artifact|component|rectangle|queue|cloud|storage)\s+\"([^\"]+)\"\s+as\s+(\w+)",
+            ln,
+            re.IGNORECASE,
+        )
+        if d:
+            kind, name, alias = d.groups()
+            label = f"{name}"
+            if kind.lower() in ("database", "storage"):
+                shape = f"{alias}[({label})]"
+            else:
+                shape = f"{alias}[{label}]"
+            nodes[alias] = shape
+            continue
+
+    if not nodes and not edges:
+        return ""
+
+    out: list[str] = ["flowchart LR", ""]
+    for ident, shape in nodes.items():
+        out.append(f"    {shape}")
+    if nodes:
+        out.append("")
+    for a, b, rel in edges:
+        out.append(f"    {a} -->|{rel}| {b}")
+
+    return "\n".join(out)
+
+
+def plantuml_to_mermaid(code: str) -> str:
+    """
+    Decide which translator to use (sequence vs C4/structural).
+    Returns empty string if we cannot confidently translate.
+
+    NOTE: This is currently NOT rendered into MkDocs pages; it's kept
+    for export/automation purposes only.
+    """
+    if _is_sequence_diagram(code):
+        return _plantuml_sequence_to_mermaid(code)
+    # heuristic: if we see Rel( or Container( etc, treat as C4/structural
+    if re.search(r"\b(Rel\(|Container\(|Person\(|System\()", code):
+        return _plantuml_c4_to_mermaid(code)
+    return ""
+
+
+# --- Inject PlantUML into each diagram body -----------------------------------
 
 def _inject_plantuml_link(body: str, section_title: str | None = None) -> str:
     """
@@ -234,8 +401,9 @@ def _inject_plantuml_link(body: str, section_title: str | None = None) -> str:
         - a collapsible <details> block wrapping the original source
         - a requirements-style details+markdown block under the source
 
-    The original fenced block is left intact so Kroki / MkDocs plugins can
-    still render as before.
+    We DO NOT render the Mermaid variant here to avoid showing two separate
+    diagrams for the same section. Mermaid conversion is available via
+    plantuml_to_mermaid(...) for export-only use.
     """
     match = _PLANTUML_BLOCK_RE.search(body)
     if not match:
@@ -412,6 +580,56 @@ def build_project_indexes() -> None:
             lines.append("")
 
         # Back to top link at the very end
+        lines.append("[Back to top](#top)")
+        lines.append("")
+
+        index_path = project_dir / "index.md"
+        index_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+
+        print(f"[build_project_indexes] Wrote {index_path}")
+
+        # ----- Diagrams section (smaller heading level) -----
+        lines.append("### Diagrams")
+        lines.append("")
+
+        diagrams_root = project_dir / "diagrams"
+        for section_title, filename in DIAGRAM_FILES:
+            src = diagrams_root / filename
+            if not src.exists():
+                continue
+
+            body = _read_without_leading_title(src)
+            if not body:
+                continue
+
+            lines.append(f"#### {section_title}")
+            lines.append("")
+
+            # existing: inject PlantUML image + source + requirements panel
+            body = _inject_plantuml_link(body, section_title)
+            lines.append(body)
+            lines.append("")
+            lines.append("---")
+            lines.append("")
+
+        # --- Send to Pipeline button + Back to top link ---------------------
+
+        # Button posts to the Workbench API for this project
+        lines.append(
+            f'<form action="https://workbench.shafie.org/api/projects/{slug}/pipeline" '
+            f'method="post" style="margin-top:24px;margin-bottom:8px;">'
+        )
+        lines.append(
+            '<button type="submit" '
+            'style="padding:8px 16px; border-radius:4px; border:none; '
+            'background:#1a73e8; color:#fff; cursor:pointer;">'
+            'Send to Pipeline'
+            '</button>'
+        )
+        lines.append("</form>")
+        lines.append("")
+
+        # Back to top anchor link (keep existing behavior)
         lines.append("[Back to top](#top)")
         lines.append("")
 

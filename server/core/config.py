@@ -2,6 +2,12 @@
 
 import os
 
+# Shared secret used for Workbench session / signing
+AW_SECRET = os.getenv("AW_SECRET", "dev-aw-secret-change-me")
+
+# Name of the session cookie used by Workbench
+SESSION_COOKIE = "aw_session"
+
 # MkDocs base for preview links
 DOCS_BASE = os.getenv("DOCS_BASE", "https://docs.shafie.org").rstrip("/")
 
