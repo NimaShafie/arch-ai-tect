@@ -46,3 +46,6 @@ extra:
     kroki: https://kroki.shafie.org/
     plantuml: https://uml.shafie.org/
     docs: https://docs.shafie.org/
+watch:
+  - docs
+  - mkdocs.yml
