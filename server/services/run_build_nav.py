@@ -9,20 +9,22 @@ from server.services.mkdocs_nav import build_nav
 PROJECTS_ROOT = Path("docs") / "projects"
 
 # Files we expect under each project, grouped by section
+# NOTE: these names are aligned with docs/projects/*/package
 PACKAGE_FILES = [
-    ("Architecture Spec", "architecture-spec.md"),
-    ("Software Requirements Spec (SRS)", "software-requirements-spec.md"),
-    ("Reference Architecture", "reference-architecture.md"),
+    ("Architecture Spec", "spec.md"),
+    ("Software Requirements Spec (SRS)", "srs.md"),
+    ("Reference Architecture", "reference-arch.md"),
     ("Implementation Guide", "implementation-guide.md"),
 ]
 
+# NOTE: these names are aligned with docs/projects/*/diagrams
 DIAGRAM_FILES = [
-    ("C4 Context", "c4-context.md"),
-    ("C4 Container", "c4-container.md"),
-    ("C4 Component", "c4-component.md"),
-    ("Logical View", "logical-view.md"),
-    ("Deployment View", "deployment-view.md"),
-    ("Sequence Diagram", "sequence-diagram.md"),
+    ("C4 Context", "c4_context.md"),
+    ("C4 Container", "c4_container.md"),
+    ("C4 Component", "c4_component.md"),
+    ("Logical View", "logical.md"),
+    ("Deployment View", "deployment.md"),
+    ("Sequence Diagram", "sequence.md"),
 ]
 
 
