@@ -3,6 +3,7 @@
 from pathlib import Path
 import re
 import zlib
+import html
 
 from server.services.mkdocs_nav import build_nav
 
@@ -100,15 +101,18 @@ _SECTION_HEADINGS = {
 def _normalize_internal_headings(text: str) -> str:
     """
     For internal headings like 'Summary', 'Context', etc., standardize their
-    size to match the 'Diagrams' heading (###) and insert a horizontal rule
-    before them for extra separation.
+    size to match the 'Diagrams' heading (###).
+
+    NOTE: We intentionally DO NOT add horizontal rules here anymore, so
+    sections like Summary / Context / Actors / Key Scenarios read as a
+    continuous block under Reference Architecture or Implementation Guide.
     """
     def repl(match: re.Match) -> str:
         hashes = match.group(1)
         title = match.group(2).strip()
         if title in _SECTION_HEADINGS:
-            # Add separator and normalize to ### <Title>
-            return f"---\n\n### {title}"
+            # Normalize to ### <Title> only (no extra --- separators)
+            return f"### {title}"
         return match.group(0)
 
     pattern = re.compile(r"^(#+)\s+(.*)\s*$", re.MULTILINE)
@@ -118,9 +122,11 @@ def _normalize_internal_headings(text: str) -> str:
 def _generate_requirements_from_plantuml(code: str, section_title: str | None) -> str:
     """
     Extract a rich, software-requirements-style description from the PlantUML
-    text. The result is returned as a heading followed by a fenced
-    ```markdown``` block so it renders in a 'markdown box' on the page.
-    Inside the block we keep plain text (no markdown formatting).
+    text.
+
+    Returns an HTML <details open> block with a summary title and an inner
+    fenced ```markdown``` block so it still renders as markdown and can be
+    copied/piped into downstream tools easily.
     """
     bullets: list[str] = []
 
@@ -186,7 +192,7 @@ def _generate_requirements_from_plantuml(code: str, section_title: str | None) -
             )
             continue
 
-    # If we still didn't extract anything, provide a generic but useful description
+    # If nothing parsed, provide a generic but useful description
     if not bullets:
         title = section_title or "this diagram"
         bullets.append(
@@ -204,22 +210,29 @@ def _generate_requirements_from_plantuml(code: str, section_title: str | None) -
             "resilience) must be applied to all links and components shown in the diagram."
         )
 
-    heading = "#### Requirements derived from this diagram"
-    if section_title:
-        heading = f"#### Requirements for {section_title}"
+    title = section_title or "Diagram"
+    summary = f"Requirements for {title}"
 
-    body = "\n".join(bullets)
-    return f"{heading}\n\n```markdown\n{body}\n```"
+    bullets_text = "\n".join(bullets)
+
+    # details panel (blue box) + inner markdown fence, so it both looks nice
+    # and stays pure markdown for copy/paste or downstream AI tools
+    return (
+        f'<details open>\n'
+        f'<summary>{html.escape(summary)}</summary>\n\n'
+        f'```markdown\n{bullets_text}\n```\n\n'
+        f'</details>'
+    )
 
 
 def _inject_plantuml_link(body: str, section_title: str | None = None) -> str:
     """
     If the body contains a PlantUML code block, compute the encoded URL and
     prepend:
-        - 'Open in PlantUML' link (HTML viewer)
+        - 'Open in PlantUML' link (HTML viewer, opens in new tab)
         - the PNG image rendered by the PlantUML server
         - a collapsible <details> block wrapping the original source
-        - a requirements-style markdown box under the source
+        - a requirements-style details+markdown block under the source
 
     The original fenced block is left intact so Kroki / MkDocs plugins can
     still render as before.
@@ -236,7 +249,11 @@ def _inject_plantuml_link(body: str, section_title: str | None = None) -> str:
     viewer_url = f"{PLANTUML_SERVER_BASE}/uml/{encoded}"
     png_url = f"{PLANTUML_SERVER_BASE}/png/{encoded}"
 
-    link_line = f"[Open in PlantUML]({viewer_url})"
+    # HTML link so we can force target="_blank"
+    link_line = (
+        f'<a href="{html.escape(viewer_url)}" '
+        f'target="_blank" rel="noopener">Open in PlantUML</a>'
+    )
     # Avoid duplicating on repeated runs
     if link_line in body:
         return body
@@ -244,7 +261,7 @@ def _inject_plantuml_link(body: str, section_title: str | None = None) -> str:
     alt_label = section_title or "Diagram"
     alt_label = alt_label.strip()
 
-    requirements_md = _generate_requirements_from_plantuml(code, section_title)
+    requirements_block = _generate_requirements_from_plantuml(code, section_title)
 
     wrapped_body = (
         f"{link_line}\n\n"
@@ -253,7 +270,7 @@ def _inject_plantuml_link(body: str, section_title: str | None = None) -> str:
         "<summary>Show PlantUML source</summary>\n\n"
         f"{body}\n\n"
         "</details>\n\n"
-        f"{requirements_md}\n"
+        f"{requirements_block}\n"
     )
 
     return wrapped_body
@@ -299,7 +316,8 @@ def build_project_indexes() -> None:
       - Subsections    -> #### (each spec/diagram)
 
     A 'Back to top' link is appended at the bottom. Horizontal rules are used
-    throughout to clearly separate sections and diagrams.
+    between top-level package/diagram sections, but not inside Reference
+    Architecture / Implementation Guide inner headings.
     """
     if not PROJECTS_ROOT.exists():
         print(f"[build_project_indexes] No {PROJECTS_ROOT} directory, skipping.")
@@ -358,7 +376,7 @@ def build_project_indexes() -> None:
             lines.append("")
             lines.append(body)
             lines.append("")
-            # Separator after each package section
+            # Separator after each top-level package section (spec, SRS, ref-arch, impl-guide)
             lines.append("---")
             lines.append("")
 
@@ -384,7 +402,7 @@ def build_project_indexes() -> None:
             lines.append("")
 
             # Add PlantUML link + PNG image + collapsible source +
-            # rich requirements markdown box, while keeping original fenced
+            # rich requirements details panel, while keeping original fenced
             # block intact.
             body = _inject_plantuml_link(body, section_title)
             lines.append(body)
