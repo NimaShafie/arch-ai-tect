@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
 
 from server.db import init_db
 from server.routers import (
@@ -15,7 +16,7 @@ from server.routers import (
     brief_ai,
     generate,
     ui,
-    pipeline,  # <-- new
+    pipeline,
 )
 
 
@@ -24,6 +25,15 @@ def create_app() -> FastAPI:
     Main FastAPI application factory for ArchAiTect Workbench.
     """
     app = FastAPI(title="ArchAiTect Workbench")
+
+    # Allow docs.shafie.org to call the pipeline endpoint via fetch()
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["https://docs.shafie.org"],
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["*"],
+    )
 
     # Initialize DB (safe to call once at startup)
     init_db()
@@ -45,8 +55,6 @@ def create_app() -> FastAPI:
     app.include_router(brief_ai.router)
     app.include_router(generate.router)
     app.include_router(ui.router)
-
-    # New pipeline router for "Send to Pipeline"
     app.include_router(pipeline.router)
 
     # Root redirect to UI

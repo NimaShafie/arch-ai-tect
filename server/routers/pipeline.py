@@ -1,162 +1,207 @@
 # server/routers/pipeline.py
 
-from __future__ import annotations
-
+from pathlib import Path
 import os
 import subprocess
-from pathlib import Path
-from typing import Dict, List
+from typing import List
 
 from fastapi import APIRouter, HTTPException
 
+from server.services.run_build_nav import (
+    PROJECTS_ROOT,
+    DIAGRAM_FILES,
+    _read_without_leading_title,
+    build_pipeline_diagram_markdown,
+)
+
 router = APIRouter(prefix="/api/projects", tags=["pipeline"])
 
-# Where the docs live in THIS repo
-DOCS_ROOT = Path("docs") / "projects"
+# Default location of the Disney+ docs repo if PIPELINE_REPO_DIR is not set
+DEFAULT_PIPELINE_REPO_DIR = "/home/n1mz/projects/disney-ai-plus"
 
 
-def _run_git(args: List[str], cwd: Path) -> None:
-    """Run a git command in the pipeline repo; raise HTTPException on failure."""
-    try:
-        proc = subprocess.run(
-            ["git", *args],
-            cwd=str(cwd),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            check=False,
-        )
-    except Exception as e:  # pragma: no cover
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to run git command {args}: {e}",
-        )
-
+def _git(args: List[str], cwd: Path) -> str:
+    """Run a git command and return stdout, raising on failure."""
+    proc = subprocess.run(
+        ["git", *args],
+        cwd=str(cwd),
+        text=True,
+        capture_output=True,
+    )
     if proc.returncode != 0:
-        raise HTTPException(
-            status_code=500,
-            detail=(
-                f"git {' '.join(args)} failed with code {proc.returncode}: "
-                f"{proc.stderr.strip()}"
-            ),
-        )
+        raise RuntimeError(f"git {' '.join(args)} failed: {proc.stderr.strip()}")
+    return proc.stdout.strip()
 
 
-def _get_pipeline_repo_dir() -> Path:
-    """Resolve and validate PIPELINE_REPO_DIR."""
-    repo_dir = os.getenv("PIPELINE_REPO_DIR")
-    if not repo_dir:
-        raise HTTPException(
-            status_code=500,
-            detail="PIPELINE_REPO_DIR environment variable is not set.",
-        )
-    path = Path(repo_dir)
-    if not path.exists() or not path.is_dir():
-        raise HTTPException(
-            status_code=500,
-            detail=f"PIPELINE_REPO_DIR '{repo_dir}' does not exist or is not a directory.",
-        )
-    return path
-
-
-def _split_arch_vs_diagrams(index_md: str) -> Dict[str, str]:
+def _export_to_pipeline(slug: str) -> dict:
     """
-    Split a project index.md into:
-      - 'architecture': everything before '### Diagrams'
-      - 'diagrams': everything from '### Diagrams' onward
-
-    If '### Diagrams' is not present, the whole file is treated as architecture.
+    Core export logic used by both GET and POST endpoints.
     """
-    marker = "### Diagrams"
-    idx = index_md.find(marker)
-    if idx == -1:
-        return {"architecture": index_md, "diagrams": ""}
-
-    arch_part = index_md[:idx].rstrip()
-    diag_part = index_md[idx:].lstrip()
-    return {"architecture": arch_part, "diagrams": diag_part}
-
-
-@router.post("/{slug}/pipeline")
-def send_project_to_pipeline(slug: str) -> Dict[str, object]:
-    """
-    Export the project's docs + diagrams into the external pipeline repo and push.
-
-    - Architecture bundle:
-        docs/projects/<slug>/index.md (up to '### Diagrams')
-        -> PIPELINE_REPO/docs/architecture/<slug>.md
-
-    - Diagrams:
-        docs/projects/<slug>/diagrams/*.md
-        -> PIPELINE_REPO/docs/diagrams/<slug>/<diagram_name>.md
-
-    Existing files are ALWAYS overwritten.
-    """
-    # 1) Validate docs in this repo
-    project_dir = DOCS_ROOT / slug
+    repo_root = Path(".").resolve()
+    project_dir = PROJECTS_ROOT / slug
     if not project_dir.exists():
-        raise HTTPException(
-            status_code=404,
-            detail=f"Project docs not found at {project_dir}",
-        )
+        raise HTTPException(status_code=404, detail="Unknown project slug")
 
     index_path = project_dir / "index.md"
     if not index_path.exists():
         raise HTTPException(
-            status_code=404,
-            detail=f"Project index.md not found at {index_path}",
+            status_code=500,
+            detail="Project index.md not found; run build_nav / docs build first.",
         )
 
-    diagrams_dir = project_dir / "diagrams"
-    if not diagrams_dir.exists():
-        diagrams_dir = None
+    # Resolve pipeline repo directory, with a sensible default
+    pipeline_repo_dir_env = os.getenv("PIPELINE_REPO_DIR", DEFAULT_PIPELINE_REPO_DIR)
+    pipeline_repo_dir = Path(pipeline_repo_dir_env).resolve()
+    if not pipeline_repo_dir.exists():
+        raise HTTPException(
+            status_code=500,
+            detail=f"PIPELINE_REPO_DIR '{pipeline_repo_dir}' does not exist.",
+        )
 
-    # 2) Read + split index.md
+    # --- Architecture file: slice index.md between '### Package' and '### Diagrams'
     index_text = index_path.read_text(encoding="utf-8")
-    parts = _split_arch_vs_diagrams(index_text)
-    arch_text = parts["architecture"]
+    pkg_marker = "\n### Package"
+    diag_marker = "\n### Diagrams"
+    pkg_pos = index_text.find(pkg_marker)
+    diag_pos = index_text.find(diag_marker)
 
-    # 3) Resolve pipeline repo
-    repo_dir = _get_pipeline_repo_dir()
-
-    arch_out_dir = repo_dir / "docs" / "architecture"
-    arch_out_dir.mkdir(parents=True, exist_ok=True)
-    arch_out_path = arch_out_dir / f"{slug}.md"
-    arch_out_path.write_text(arch_text.rstrip() + "\n", encoding="utf-8")
-
-    written_arch_files = [str(arch_out_path.relative_to(repo_dir))]
-
-    # 4) Export diagrams (each .md becomes its own file under docs/diagrams/<slug>/)
-    written_diagram_files: List[str] = []
-    if diagrams_dir and diagrams_dir.exists():
-        diag_out_root = repo_dir / "docs" / "diagrams" / slug
-        diag_out_root.mkdir(parents=True, exist_ok=True)
-
-        for src in sorted(diagrams_dir.glob("*.md")):
-            dest = diag_out_root / src.name
-            dest.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
-            written_diagram_files.append(str(dest.relative_to(repo_dir)))
-
-    # 5) git add / commit / push
-    #    We add the specific paths we touched.
-    paths_to_add = written_arch_files + written_diagram_files
-    _run_git(["add", *paths_to_add], cwd=repo_dir)
-
-    # Only commit if there are staged changes
-    status_proc = subprocess.run(
-        ["git", "diff", "--cached", "--quiet"],
-        cwd=str(repo_dir),
-    )
-    if status_proc.returncode != 0:  # there are staged changes
-        _run_git(
-            ["commit", "-m", f"Update architecture & diagrams for project '{slug}'"],
-            cwd=repo_dir,
+    if pkg_pos == -1:
+        raise HTTPException(
+            status_code=500,
+            detail="Could not locate '### Package' section in project index.md",
         )
-        _run_git(["push"], cwd=repo_dir)
+
+    if diag_pos == -1 or diag_pos <= pkg_pos:
+        # If there is no diagrams section yet, treat rest of file as architecture.
+        arch_body = index_text[pkg_pos:].strip()
+    else:
+        arch_body = index_text[pkg_pos:diag_pos].strip()
+
+    # Try to recover the nice project title from the index (## <Title>)
+    title = slug.replace("-", " ").title()
+    m = None
+    for line in index_text.splitlines():
+        if line.startswith("## "):
+            m = line[3:].strip()
+            break
+    if m:
+        title = m
+
+    arch_rel_path = Path("docs") / "architecture" / f"{slug}.md"
+    arch_abs = pipeline_repo_dir / arch_rel_path
+    arch_abs.parent.mkdir(parents=True, exist_ok=True)
+
+    arch_out_lines = [
+        f"# Architecture – {title}",
+        "",
+        arch_body,
+        "",
+        "---",
+        "",
+        f"_Source: generated from "
+        f"[ArchAiTect Workbench](https://workbench.shafie.org/projects/{slug}/)_",
+        "",
+    ]
+    arch_abs.write_text("\n".join(arch_out_lines).rstrip() + "\n", encoding="utf-8")
+
+    diagram_rel_paths: list[str] = []
+
+    # --- Diagrams: transform each PlantUML source into richer markdown
+    diagrams_src_root = project_dir / "diagrams"
+    diagrams_dst_root = pipeline_repo_dir / "docs" / "diagrams" / slug
+    diagrams_dst_root.mkdir(parents=True, exist_ok=True)
+
+    for section_title, filename in DIAGRAM_FILES:
+        src_path = diagrams_src_root / filename
+        if not src_path.exists():
+            continue
+
+        body = _read_without_leading_title(src_path)
+        if not body:
+            continue
+
+        rendered = build_pipeline_diagram_markdown(body, section_title, slug)
+
+        dst_rel = Path("docs") / "diagrams" / slug / filename
+        dst_abs = pipeline_repo_dir / dst_rel
+        dst_abs.parent.mkdir(parents=True, exist_ok=True)
+        dst_abs.write_text(rendered.rstrip() + "\n", encoding="utf-8")
+
+        diagram_rel_paths.append(str(dst_rel))
+
+    # --- Git commit + push --------------------------------------------------
+    try:
+        # Check whether there are content changes before staging
+        status_before = _git(["status", "--porcelain"], cwd=pipeline_repo_dir)
+        has_content_changes = bool(status_before.strip())
+
+        # Stage docs (architecture + diagrams)
+        _git(["add", "docs/architecture", "docs/diagrams"], cwd=pipeline_repo_dir)
+
+        # Always create a commit; allow-empty when there are no content changes
+        commit_args = ["commit"]
+        if not has_content_changes:
+            commit_args.append("--allow-empty")
+        commit_args += [
+            "-m",
+            f"Update architecture & diagrams for project '{slug}'",
+        ]
+        _git(commit_args, cwd=pipeline_repo_dir)
+
+        changed = True
+
+        # Try to push; if rejected because remote is ahead, auto pull + retry once
+        try:
+            _git(["push", "origin", "master"], cwd=pipeline_repo_dir)
+        except RuntimeError as push_exc:
+            msg = str(push_exc)
+            if "fetch first" in msg or "non-fast-forward" in msg:
+                # Bring local up to date, rebase, and retry push
+                _git(["pull", "--rebase", "origin", "master"], cwd=pipeline_repo_dir)
+                _git(["push", "origin", "master"], cwd=pipeline_repo_dir)
+            else:
+                # Different push error; surface it
+                raise
+
+        # Whether or not there were prior changes, we now have a new commit
+        commit_sha = _git(["rev-parse", "HEAD"], cwd=pipeline_repo_dir)
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Git operation failed: {exc}",
+        )
+
+    commit_sha_short = commit_sha[:7]
+    commit_url = (
+        f"https://github.com/SevDev21/disney-ai-plus/commit/{commit_sha}"
+    )
 
     return {
         "ok": True,
         "project": slug,
-        "architecture_file": written_arch_files[0],
-        "diagram_files": written_diagram_files,
+        "architecture_file": str(arch_rel_path),
+        "diagram_files": diagram_rel_paths,
+        "changed": changed,
+        "commit": commit_sha_short,
+        "commit_url": commit_url,
     }
+
+
+@router.post("/{slug}/pipeline")
+async def send_to_pipeline(slug: str):
+    """
+    Export the latest architecture + diagrams for a project into the
+    Disney+ pipeline repo and push a commit.
+
+    The behavior is unchanged; this POST endpoint is what the UI already calls.
+    """
+    return _export_to_pipeline(slug)
+
+
+@router.get("/{slug}/pipeline")
+async def send_to_pipeline_get(slug: str):
+    """
+    GET variant of the same pipeline export, so that direct navigation to
+    /api/projects/<slug>/pipeline (or tools using GET) behaves consistently.
+    """
+    return _export_to_pipeline(slug)
