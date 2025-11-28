@@ -184,6 +184,16 @@ def _requirements_bullets_from_plantuml(
             )
             continue
 
+        # Simple 'database db' style (no quoted name)
+        m = re.match(r"database\s+(\w+)", ln, re.IGNORECASE)
+        if m:
+            alias = m.group(1)
+            bullets.append(
+                f"- The deployment model shall include a database {alias}, and "
+                f"infrastructure tasks must provision, secure, and monitor it."
+            )
+            continue
+
     if not bullets:
         title = section_title or "this diagram"
         bullets.append(
@@ -191,16 +201,15 @@ def _requirements_bullets_from_plantuml(
             f"and implementation must ensure that all shown components, connections, and "
             f"responsibilities are realized in code, configuration, and infrastructure."
         )
-
-    bullets.append(
-        "- The development team shall treat each visual element as either a deployable "
-        "artifact, a runtime capability, or an integration point, and create tasks to "
-        "build, configure, and test each of them."
-    )
-    bullets.append(
-        "- Non-functional requirements (performance, security, observability, "
-        "resilience) must be applied to all links and components shown in the diagram."
-    )
+        bullets.append(
+            "- The development team shall treat each visual element as either a deployable "
+            "artifact, a runtime capability, or an integration point, and create tasks to "
+            "build, configure, and test each of them."
+        )
+        bullets.append(
+            "- Non-functional requirements (performance, security, observability, "
+            "resilience) must be applied to all links and components shown in the diagram."
+        )
 
     return bullets
 
@@ -233,26 +242,6 @@ def _is_sequence_diagram(code: str) -> bool:
     if re.search(r"^\s*participant\b", code, re.MULTILINE):
         return True
     return False
-
-
-def _has_deployment_shapes(code: str) -> bool:
-    """
-    Heuristic: deployment-style PlantUML with node/database/etc.
-    """
-    return bool(
-        re.search(
-            r"(?:^|\n)\s*(node|database|artifact|component|rectangle|queue|cloud|storage)\s+\"[^\"]+\"(?:\s+as\s+\w+)?",
-            code,
-            re.IGNORECASE,
-        )
-    )
-
-
-def _has_class_diagram(code: str) -> bool:
-    """
-    Heuristic: class diagram if we see at least one 'class X' line.
-    """
-    return bool(re.search(r"^\s*class\s+\w+", code, re.MULTILINE))
 
 
 def _plantuml_sequence_to_mermaid(code: str) -> str:
@@ -328,6 +317,83 @@ def _plantuml_sequence_to_mermaid(code: str) -> str:
     return "\n".join(out)
 
 
+def _plantuml_class_to_mermaid(code: str) -> str:
+    """
+    Handle simple UML class diagrams like the Logical View stub.
+
+    We preserve class attributes and simple associations such as:
+      User "1" -- "*" Subscription
+    """
+    classes: dict[str, list[str]] = {}
+    relations: list[str] = []
+
+    current_class: str | None = None
+
+    for raw in code.splitlines():
+        ln = raw.strip()
+        if not ln or ln.startswith("'"):
+            continue
+        if ln.lower().startswith("@startuml") or ln.lower().startswith("@enduml"):
+            continue
+        if ln.startswith("!"):
+            continue
+
+        # class User {  /  class Subscription {
+        m = re.match(r"class\s+(\w+)\s*\{?", ln)
+        if m:
+            current_class = m.group(1)
+            classes.setdefault(current_class, [])
+            # If line ends with '{', attributes follow on subsequent lines.
+            if ln.endswith("{"):
+                continue
+            else:
+                current_class = None
+            continue
+
+        if ln == "}" and current_class:
+            current_class = None
+            continue
+
+        # Inside a class body: treat as attribute
+        if current_class:
+            if ln:
+                classes.setdefault(current_class, []).append(ln)
+            continue
+
+        # Association with cardinalities: User "1" -- "*" Subscription
+        m = re.match(
+            r"(\w+)\s+\"([^\"]*)\"\s+--\s+\"([^\"]*)\"\s+(\w+)", ln
+        )
+        if m:
+            src, left_card, right_card, dst = m.groups()
+            relations.append(
+                f'    {src} "{left_card}" -- "{right_card}" {dst}'
+            )
+            continue
+
+    if not classes and not relations:
+        return ""
+
+    out: list[str] = ["classDiagram", ""]
+
+    # Classes + attributes
+    for name, attrs in classes.items():
+        if attrs:
+            out.append(f"    class {name} {{")
+            for attr in attrs:
+                out.append(f"        {attr}")
+            out.append("    }")
+        else:
+            out.append(f"    class {name}")
+    if classes:
+        out.append("")
+
+    # Relations
+    out.extend(relations)
+
+    return "\n".join(out)
+
+
 def _plantuml_c4_to_mermaid(code: str) -> str:
     lines = [ln.strip() for ln in code.splitlines()]
     nodes: dict[str, str] = {}
@@ -366,20 +432,37 @@ def _plantuml_c4_to_mermaid(code: str) -> str:
             edges.append((a, b, rel))
             continue
 
+        # node "Something" as alias
         d = re.match(
-            r"(node|database|artifact|component|rectangle|queue|cloud|storage)\s+\"([^\"]+)\"(?:\s+as\s+(\w+))?",
+            r"(node|database|artifact|component|rectangle|queue|cloud|storage)\s+\"([^\"]+)\"\s+as\s+(\w+)",
             ln,
             re.IGNORECASE,
         )
         if d:
             kind, name, alias = d.groups()
-            alias = alias or re.sub(r"\W+", "_", name).lower()
             label = name
             if kind.lower() in ("database", "storage"):
                 shape = f"{alias}[({label})]"
             else:
                 shape = f"{alias}[{label}]"
             nodes[alias] = shape
+            continue
+
+        # Bare node "Cloud Region" { ... }  – treat as simple node
+        d2 = re.match(r"node\s+\"([^\"]+)\"", ln, re.IGNORECASE)
+        if d2:
+            name = d2.group(1)
+            alias = re.sub(r"\W+", "_", name).lower()
+            if alias not in nodes:
+                nodes[alias] = f"{alias}[{name}]"
+            continue
+
+        # Simple 'database db' form (no quoted name)
+        db_simple = re.match(r"database\s+(\w+)", ln, re.IGNORECASE)
+        if db_simple:
+            alias = db_simple.group(1)
+            if alias not in nodes:
+                nodes[alias] = f"{alias}[({alias})]"
             continue
 
         msg_rel = re.match(r"(\w+)\s*[-\.]+>\s*(\w+)\s*:(.+)", ln)
@@ -397,77 +480,33 @@ def _plantuml_c4_to_mermaid(code: str) -> str:
     if nodes:
         out.append("")
     for a, b, rel in edges:
-        out.append(f"    {a} -->|{rel}| {b}")
-
-    return "\n".join(out)
-
-
-def _plantuml_class_to_mermaid(code: str) -> str:
-    """
-    Minimal converter for simple PlantUML class diagrams (Logical View).
-    """
-    lines = [ln.rstrip() for ln in code.splitlines()]
-    classes: set[str] = set()
-    edges: list[tuple[str, str]] = []
-
-    for ln in lines:
-        stripped = ln.strip()
-        if not stripped or stripped.startswith("'"):
-            continue
-        low = stripped.lower()
-        if low.startswith("@startuml") or low.startswith("@enduml"):
-            continue
-        if stripped.startswith("!"):
-            continue
-
-        mc = re.match(r"class\s+([A-Za-z_][A-Za-z0-9_]*)", stripped)
-        if mc:
-            classes.add(mc.group(1))
-            continue
-
-        # Strip quoted cardinalities etc. then look for A -- B / A ..> B / etc.
-        no_quotes = re.sub(r'"[^"]*"', "", stripped)
-        me = re.match(
-            r"([A-Za-z_][A-Za-z0-9_]*)\s*[-\.]+[<>]?\s*([A-Za-z_][A-Za-z0-9_]*)",
-            no_quotes,
-        )
-        if me:
-            a, b = me.group(1), me.group(2)
-            edges.append((a, b))
-            classes.add(a)
-            classes.add(b)
-            continue
-
-    if not classes and not edges:
-        return ""
-
-    out: list[str] = ["classDiagram", ""]
-    for c in sorted(classes):
-        out.append(f"    class {c}")
-    if classes:
-        out.append("")
-    for a, b in edges:
-        out.append(f"    {a} --> {b}")
+        if rel:
+            out.append(f"    {a} -->|{rel}| {b}")
+        else:
+            out.append(f"    {a} --> {b}")
 
     return "\n".join(out)
 
 
 def plantuml_to_mermaid(code: str) -> str:
     """
-    Decide which converter to use based on simple heuristics.
+    Dispatch PlantUML → Mermaid:
+      - sequenceDiagram for sequence diagrams
+      - classDiagram for simple UML class diagrams (Logical View)
+      - flowchart LR for C4/deployment-ish diagrams
     """
     if _is_sequence_diagram(code):
         return _plantuml_sequence_to_mermaid(code)
 
-    if re.search(r"\b(Rel\(|Container\(|Person\(|System\()", code) or _has_deployment_shapes(code):
-        mermaid = _plantuml_c4_to_mermaid(code)
-        if mermaid:
-            return mermaid
+    # Logical / class diagrams
+    if re.search(r"^\s*class\s+\w+", code, re.MULTILINE):
+        mer = _plantuml_class_to_mermaid(code)
+        if mer:
+            return mer
 
-    if _has_class_diagram(code):
-        mermaid = _plantuml_class_to_mermaid(code)
-        if mermaid:
-            return mermaid
+    # C4 / deployment style
+    if re.search(r"\b(Rel\(|Container\(|Person\(|System\()", code) or "node " in code:
+        return _plantuml_c4_to_mermaid(code)
 
     return ""
 
@@ -514,61 +553,45 @@ def _inject_plantuml_link(body: str, section_title: str | None = None) -> str:
 # --- Pipeline exporter helpers -----------------------------------------------
 
 
-def _strip_trailing_hr(text: str) -> str:
-    """
-    Remove trailing '---' lines at the end of a markdown block.
-    Used so architecture exports don't end up with double separators.
-    """
-    lines = text.rstrip().splitlines()
-    while lines and lines[-1].strip() == "---":
-        lines.pop()
-    return "\n".join(lines)
-
-
 def build_pipeline_diagram_markdown(
     body: str, section_title: str, project_slug: str
 ) -> str:
     """
-    Build the Markdown that gets exported into the external pipeline repo.
+    Build the GitHub-friendly diagram page:
 
-    - For PlantUML diagrams, we add a PlantUML viewer link, a Mermaid preview,
-      requirements, and a Source footer.
-    - For non-diagram sections (e.g., Architecture – <slug>), we just wrap the
-      body and add a single horizontal rule + Source footer, avoiding doubles.
+      # Title
+      [Open in PlantUML](...)
+      ```mermaid ...```  (when possible)
+      ## Requirements
+      ...
+      ---
+      _Source: generated from ArchAiTect Workbench(...)
+
+    No PNG image is embedded here so GitHub never shows a broken image icon.
     """
     match = _PLANTUML_BLOCK_RE.search(body)
-    source_url = f"https://workbench.shafie.org/projects/{project_slug}/"
-
-    # ------------------------------------------------------------------ #
-    # CASE 1: No PlantUML block (e.g. Architecture export)
-    # ------------------------------------------------------------------ #
     if not match:
-        cleaned = _strip_trailing_hr(body.strip())
-        out: list[str] = []
-        out.append(f"# {section_title}")
-        out.append("")
-        if cleaned:
-            out.append(cleaned)
-            out.append("")
-        # Exactly one HR + Source footer
-        out.append("---")
-        out.append("")
-        out.append(
+        source_url = f"https://workbench.shafie.org/projects/{project_slug}/"
+        out = [
+            f"# {section_title}",
+            "",
+            body.strip(),
+            "",
+            "---",
+            "",
             f"_Source: generated from "
-            f"[ArchAiTect Workbench]({source_url})_"
-        )
-        out.append("")
+            f"[ArchAiTect Workbench]({source_url})_",
+            "",
+        ]
         return "\n".join(out)
 
-    # ------------------------------------------------------------------ #
-    # CASE 2: We have PlantUML – full diagram doc with Mermaid preview
-    # ------------------------------------------------------------------ #
     code = match.group(1).strip()
     encoded = encode_plantuml(code)
     viewer_url = f"{PLANTUML_SERVER_BASE}/uml/{encoded}"
 
     mermaid = plantuml_to_mermaid(code)
     bullets = _requirements_bullets_from_plantuml(code, section_title)
+    source_url = f"https://workbench.shafie.org/projects/{project_slug}/"
 
     out: list[str] = []
     out.append(f"# {section_title}")
@@ -582,6 +605,7 @@ def build_pipeline_diagram_markdown(
         out.append("```")
         out.append("")
     else:
+        # Fallback text when we can't render a Mermaid preview
         out.append(
             "_Diagram preview unavailable; see PlantUML source via the link above._"
         )

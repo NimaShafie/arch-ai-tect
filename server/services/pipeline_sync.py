@@ -156,6 +156,7 @@ def _build_diagram_doc(
     png_url = f"{PLANTUML_SERVER_BASE}/png/{encoded}"
 
     bullets = _requirements_bullets_from_plantuml(plantuml_code, diagram_title)
+    source_url = f"https://workbench.shafie.org/projects/{slug}/"
 
     lines: list[str] = []
     lines.append(f"# {diagram_title}")
@@ -164,15 +165,17 @@ def _build_diagram_doc(
     lines.append("")
     lines.append(f"![{diagram_title}]({png_url})")
     lines.append("")
-    lines.append("```plantuml")
-    lines.append(plantuml_code)
-    lines.append("```")
-    lines.append("")
     lines.append("## Requirements")
     lines.append("")
     lines.extend(bullets)
     lines.append("")
-
+    lines.append("---")
+    lines.append("")
+    lines.append(
+        f"_Source: generated from "
+        f"[ArchAiTect Workbench]({source_url})_"
+    )
+    lines.append("")
     return "\n".join(lines)
 
 
@@ -197,7 +200,29 @@ def sync_project_to_pipeline(slug: str) -> dict:
     arch_dir = repo_dir / "docs" / "architecture"
     arch_dir.mkdir(parents=True, exist_ok=True)
     arch_path = arch_dir / f"{slug}.md"
-    arch_path.write_text(pre_diagrams_markdown + "\n", encoding="utf-8")
+
+    # Normalize trailing separators and append a single '---' + Source line.
+    source_url = f"https://workbench.shafie.org/projects/{slug}/"
+    lines = pre_diagrams_markdown.splitlines()
+
+    # Drop trailing blank lines
+    while lines and not lines[-1].strip():
+        lines.pop()
+
+    # If the last non-blank line is a horizontal rule, drop it;
+    # we'll add exactly one below.
+    if lines and lines[-1].strip() == "---":
+        lines.pop()
+
+    body = "\n".join(lines).rstrip()
+
+    arch_markdown = (
+        f"{body}\n\n"
+        "---\n\n"
+        f"_Source: generated from [ArchAiTect Workbench]({source_url})_\n"
+    )
+
+    arch_path.write_text(arch_markdown, encoding="utf-8")
 
     # ---- Diagrams section (one file per diagram) ---------------------------
     diagrams_root = project_dir / "diagrams"
