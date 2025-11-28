@@ -77,6 +77,24 @@ def _export_to_pipeline(slug: str) -> dict:
     else:
         arch_body = index_text[pkg_pos:diag_pos].strip()
 
+    # --- CLEAN UP trailing footer from the Workbench index so we don't
+    #     get double '---' and double '_Source:' in the Disney repo.
+    arch_lines = arch_body.splitlines()
+
+    # remove trailing blank lines
+    while arch_lines and not arch_lines[-1].strip():
+        arch_lines.pop()
+
+    # drop trailing '_Source: ...' line if present
+    if arch_lines and arch_lines[-1].lstrip().startswith("_Source:"):
+        arch_lines.pop()
+
+    # drop any trailing horizontal rules
+    while arch_lines and arch_lines[-1].strip() == "---":
+        arch_lines.pop()
+
+    arch_body_clean = "\n".join(arch_lines).rstrip()
+
     # Try to recover the nice project title from the index (## <Title>)
     title = slug.replace("-", " ").title()
     m = None
@@ -94,7 +112,7 @@ def _export_to_pipeline(slug: str) -> dict:
     arch_out_lines = [
         f"# Architecture – {title}",
         "",
-        arch_body,
+        arch_body_clean,
         "",
         "---",
         "",
@@ -120,7 +138,26 @@ def _export_to_pipeline(slug: str) -> dict:
         if not body:
             continue
 
-        rendered = build_pipeline_diagram_markdown(body, section_title, slug)
+        # CLEAN trailing footer from the diagram source as well
+        diag_lines = body.splitlines()
+
+        # remove trailing blank lines
+        while diag_lines and not diag_lines[-1].strip():
+            diag_lines.pop()
+
+        # drop trailing '_Source: ...' if present
+        if diag_lines and diag_lines[-1].lstrip().startswith("_Source:"):
+            diag_lines.pop()
+
+        # drop any trailing horizontal rules
+        while diag_lines and diag_lines[-1].strip() == "---":
+            diag_lines.pop()
+
+        body_clean = "\n".join(diag_lines).rstrip()
+        if not body_clean:
+            continue
+
+        rendered = build_pipeline_diagram_markdown(body_clean, section_title, slug)
 
         dst_rel = Path("docs") / "diagrams" / slug / filename
         dst_abs = pipeline_repo_dir / dst_rel

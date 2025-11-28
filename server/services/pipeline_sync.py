@@ -197,10 +197,14 @@ def _build_diagram_doc(
     return "\n".join(out)
 
 
-def sync_project_to_pipeline(slug: str) -> dict:
+def sync_project_to_pipeline(slug: str, do_git: bool = True) -> dict:
     """
     Copy the current project's architecture + diagrams into the
-    SevDev21/disney-ai-plus repo and git push.
+    SevDev21/disney-ai-plus repo.
+
+    If do_git is True (default), also git add/commit/push.
+    When called from the FastAPI pipeline endpoint we set do_git=False
+    so that run_export_pipeline() can handle git in a single place.
     """
     project_dir = PROJECTS_ROOT / slug
     if not project_dir.exists():
@@ -210,43 +214,40 @@ def sync_project_to_pipeline(slug: str) -> dict:
 
     repo_dir = _get_repo_dir()
 
-    # Make sure we're up to date before writing
-    _run_git(repo_dir, "fetch", "--all", check=True)
-    _run_git(repo_dir, "pull", "--rebase", check=True)
+    if do_git:
+        # Make sure we're up to date before writing
+        _run_git(repo_dir, "fetch", "--all", check=True)
+        _run_git(repo_dir, "pull", "--rebase", check=True)
 
     # ---- Architecture / package section (single file) -----------------------
     pre_diagrams_markdown = _extract_pre_diagrams_markdown(project_dir)
 
-    # Look at the final non-blank line; if it's already '---',
-    # don't add another horizontal rule before the footer.
     arch_dir = repo_dir / "docs" / "architecture"
     arch_dir.mkdir(parents=True, exist_ok=True)
     arch_path = arch_dir / f"{slug}.md"
 
     source_url = f"https://workbench.shafie.org/projects/{slug}/"
 
+    # Normalize trailing separators so we end up with EXACTLY ONE '---'
+    # before the Source footer, even if the source index.md had extras.
     body = pre_diagrams_markdown.rstrip()
     lines = body.splitlines()
-    last_non_blank = ""
-    for line in reversed(lines):
-        if line.strip():
-            last_non_blank = line.strip()
-            break
 
-    if last_non_blank == "---":
-        # Already has a trailing separator; just add footer.
-        arch_text = (
-            body.rstrip()
-            + "\n\n"
-            + f"_Source: generated from [ArchAiTect Workbench]({source_url})_\n"
-        )
-    else:
-        # No trailing separator; insert one before footer.
-        arch_text = (
-            body.rstrip()
-            + "\n\n---\n\n"
-            + f"_Source: generated from [ArchAiTect Workbench]({source_url})_\n"
-        )
+    # Remove trailing blank lines
+    while lines and not lines[-1].strip():
+        lines.pop()
+
+    # Remove all trailing horizontal rules ('---'); we'll add one back.
+    while lines and lines[-1].strip() == "---":
+        lines.pop()
+
+    body_clean = "\n".join(lines).rstrip()
+
+    arch_text = (
+        body_clean
+        + "\n\n---\n\n"
+        + f"_Source: generated from [ArchAiTect Workbench]({source_url})_\n"
+    )
 
     arch_path.write_text(arch_text, encoding="utf-8")
 
@@ -293,23 +294,24 @@ def sync_project_to_pipeline(slug: str) -> dict:
         out_path.write_text(doc, encoding="utf-8")
         written_diagrams.append(str(out_path.relative_to(repo_dir)))
 
-    # Stage, commit, push
-    _run_git(
-        repo_dir,
-        "add",
-        "docs/architecture",
-        "docs/diagrams",
-        check=True,
-    )
-    # Commit can be empty; ignore non-zero return in that case
-    _run_git(
-        repo_dir,
-        "commit",
-        "-m",
-        f"Sync architecture from ArchAiTect for {slug}",
-        check=False,
-    )
-    _run_git(repo_dir, "push", check=True)
+    # Stage, commit, push (optional)
+    if do_git:
+        _run_git(
+            repo_dir,
+            "add",
+            "docs/architecture",
+            "docs/diagrams",
+            check=True,
+        )
+        # Commit can be empty; ignore non-zero return in that case
+        _run_git(
+            repo_dir,
+            "commit",
+            "-m",
+            f"Sync architecture from ArchAiTect for {slug}",
+            check=False,
+        )
+        _run_git(repo_dir, "push", check=True)
 
     return {
         "architecture_file": str(arch_path.relative_to(repo_dir)),
