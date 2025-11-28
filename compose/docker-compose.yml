@@ -72,6 +72,7 @@ services:
     build:
       context: ..
       dockerfile: compose/docs/Dockerfile
+    pull_policy: never
     image: local/mkdocs-material-with-plugins:latest
     container_name: docs
     restart: unless-stopped
