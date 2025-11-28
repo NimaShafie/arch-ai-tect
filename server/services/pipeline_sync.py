@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 from pathlib import Path
-import re
 
 from slugify import slugify
 
@@ -46,6 +46,11 @@ def _run_git(repo_dir: Path, *args: str, check: bool = True) -> None:
 
 
 def _extract_pre_diagrams_markdown(project_dir: Path) -> str:
+    """
+    Take docs/projects/<slug>/index.md and return everything BEFORE the
+    '### Diagrams' heading. This becomes docs/architecture/<slug>.md
+    in the disney-ai-plus repo.
+    """
     index_path = project_dir / "index.md"
     if not index_path.exists():
         raise PipelineSyncError(f"Project index not found: {index_path}")
@@ -61,6 +66,10 @@ def _extract_pre_diagrams_markdown(project_dir: Path) -> str:
 
 
 def _extract_plantuml_code(md_text: str) -> str | None:
+    """
+    Find the first ```plantuml``` (or ```kroki-plantuml```) code block
+    and return just the PlantUML source inside it.
+    """
     m = _PLANTUML_BLOCK_RE.search(md_text)
     if not m:
         return None
@@ -151,6 +160,14 @@ def _build_diagram_doc(
     diagram_title: str,
     plantuml_code: str,
 ) -> str:
+    """
+    Build the *GitHub-facing* diagram markdown.
+
+    - Link to the PlantUML viewer.
+    - Embed the PNG rendered by the PlantUML server.
+    - Append a plain Markdown Requirements section.
+    - Append the Source footer.
+    """
     encoded = encode_plantuml(plantuml_code)
     viewer_url = f"{PLANTUML_SERVER_BASE}/uml/{encoded}"
     png_url = f"{PLANTUML_SERVER_BASE}/png/{encoded}"
@@ -158,25 +175,26 @@ def _build_diagram_doc(
     bullets = _requirements_bullets_from_plantuml(plantuml_code, diagram_title)
     source_url = f"https://workbench.shafie.org/projects/{slug}/"
 
-    lines: list[str] = []
-    lines.append(f"# {diagram_title}")
-    lines.append("")
-    lines.append(f"[Open in PlantUML]({viewer_url})")
-    lines.append("")
-    lines.append(f"![{diagram_title}]({png_url})")
-    lines.append("")
-    lines.append("## Requirements")
-    lines.append("")
-    lines.extend(bullets)
-    lines.append("")
-    lines.append("---")
-    lines.append("")
-    lines.append(
+    out: list[str] = []
+    out.append(f"# {diagram_title}")
+    out.append("")
+    out.append(f"[Open in PlantUML]({viewer_url})")
+    out.append("")
+    out.append(f"![{diagram_title}]({png_url})")
+    out.append("")
+    out.append("## Requirements")
+    out.append("")
+    out.extend(bullets)
+    out.append("")
+    out.append("---")
+    out.append("")
+    out.append(
         f"_Source: generated from "
         f"[ArchAiTect Workbench]({source_url})_"
     )
-    lines.append("")
-    return "\n".join(lines)
+    out.append("")
+
+    return "\n".join(out)
 
 
 def sync_project_to_pipeline(slug: str) -> dict:
@@ -186,7 +204,9 @@ def sync_project_to_pipeline(slug: str) -> dict:
     """
     project_dir = PROJECTS_ROOT / slug
     if not project_dir.exists():
-        raise PipelineSyncError(f"Unknown project slug: {slug} (dir {project_dir} missing)")
+        raise PipelineSyncError(
+            f"Unknown project slug: {slug} (dir {project_dir} missing)"
+        )
 
     repo_dir = _get_repo_dir()
 
@@ -197,32 +217,38 @@ def sync_project_to_pipeline(slug: str) -> dict:
     # ---- Architecture / package section (single file) -----------------------
     pre_diagrams_markdown = _extract_pre_diagrams_markdown(project_dir)
 
+    # Look at the final non-blank line; if it's already '---',
+    # don't add another horizontal rule before the footer.
     arch_dir = repo_dir / "docs" / "architecture"
     arch_dir.mkdir(parents=True, exist_ok=True)
     arch_path = arch_dir / f"{slug}.md"
 
-    # Normalize trailing separators and append a single '---' + Source line.
     source_url = f"https://workbench.shafie.org/projects/{slug}/"
-    lines = pre_diagrams_markdown.splitlines()
 
-    # Drop trailing blank lines
-    while lines and not lines[-1].strip():
-        lines.pop()
+    body = pre_diagrams_markdown.rstrip()
+    lines = body.splitlines()
+    last_non_blank = ""
+    for line in reversed(lines):
+        if line.strip():
+            last_non_blank = line.strip()
+            break
 
-    # If the last non-blank line is a horizontal rule, drop it;
-    # we'll add exactly one below.
-    if lines and lines[-1].strip() == "---":
-        lines.pop()
+    if last_non_blank == "---":
+        # Already has a trailing separator; just add footer.
+        arch_text = (
+            body.rstrip()
+            + "\n\n"
+            + f"_Source: generated from [ArchAiTect Workbench]({source_url})_\n"
+        )
+    else:
+        # No trailing separator; insert one before footer.
+        arch_text = (
+            body.rstrip()
+            + "\n\n---\n\n"
+            + f"_Source: generated from [ArchAiTect Workbench]({source_url})_\n"
+        )
 
-    body = "\n".join(lines).rstrip()
-
-    arch_markdown = (
-        f"{body}\n\n"
-        "---\n\n"
-        f"_Source: generated from [ArchAiTect Workbench]({source_url})_\n"
-    )
-
-    arch_path.write_text(arch_markdown, encoding="utf-8")
+    arch_path.write_text(arch_text, encoding="utf-8")
 
     # ---- Diagrams section (one file per diagram) ---------------------------
     diagrams_root = project_dir / "diagrams"
@@ -238,13 +264,32 @@ def sync_project_to_pipeline(slug: str) -> dict:
 
         md_text = src.read_text(encoding="utf-8")
         code = _extract_plantuml_code(md_text)
-        if not code:
-            continue
 
         diagram_slug = slugify(diagram_title)
         out_path = diagrams_base_dir / f"{diagram_slug}.md"
 
-        doc = _build_diagram_doc(slug, diagram_title, code)
+        source_url = f"https://workbench.shafie.org/projects/{slug}/"
+
+        if code:
+            doc = _build_diagram_doc(slug, diagram_title, code)
+        else:
+            # Fallback: no PlantUML block found; just copy the body and
+            # add a Source footer.
+            body_fallback = md_text.strip()
+            doc_lines: list[str] = []
+            doc_lines.append(f"# {diagram_title}")
+            doc_lines.append("")
+            if body_fallback:
+                doc_lines.append(body_fallback)
+                doc_lines.append("")
+            doc_lines.append("---")
+            doc_lines.append("")
+            doc_lines.append(
+                f"_Source: generated from [ArchAiTect Workbench]({source_url})_"
+            )
+            doc_lines.append("")
+            doc = "\n".join(doc_lines)
+
         out_path.write_text(doc, encoding="utf-8")
         written_diagrams.append(str(out_path.relative_to(repo_dir)))
 
