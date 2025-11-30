@@ -2,3 +2,68 @@
 .md-nav__item--nested > .md-nav__link::after {
   display: none;
 }
+
+/* Latest projects grid layout */
+.latest-projects-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.5rem;
+  margin-top: 0.75rem;
+}
+
+/* Individual project card */
+.project-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  border-radius: 0.75rem;
+  background-color: var(--md-surface, #ffffff);
+  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.08);
+}
+
+/* Emoji / icon on the left */
+.project-icon {
+  font-size: 2rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+/* Main content column */
+.project-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+/* Title + meta */
+.project-title {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.project-meta {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--md-default-fg-color--light, #64748b);
+}
+
+/* Summary text */
+.project-text {
+  margin: 0.5rem 0 0;
+  font-size: 0.9rem;
+}
+
+/* Button row */
+.project-links {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* Remove extra margins MkDocs buttons normally add */
+.project-links .md-button {
+  margin: 0;
+}

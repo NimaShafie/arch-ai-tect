@@ -1,60 +1,245 @@
 // docs/assets/projects.js
+// Dynamic project listings for the MkDocs site:
+// - On /projects/ index: fills #wb-projects with a simple list.
+// - On the home page: fills #wb-latest-projects with nice "card" layout.
+//
+// Uses the Workbench API: GET /api/projects
+// Falls back to a static list if the API can't be reached (e.g., CORS/403).
+
 (function () {
-  const cfg = (window.__WB_CFG || {});
-  // Prefer env-like globals injected by mkdocs extra_javascript or a small inline script
-  const DEFAULT_API = 'https://workbench.shafie.org';
+  const cfg = window.__WB_CFG || {};
+  const DEFAULT_API = "https://workbench.shafie.org";
+
+  // Static fallback projects (used if the API call fails).
+  // You can edit these slugs/names/summaries as your real projects evolve.
+  const STATIC_PROJECTS = [
+    {
+      slug: "disney-ai-v3",
+      name: "Disney+ AI Clone",
+      summary:
+        "End-to-end architecture for a Disney+ style streaming platform with AI-assisted workflows.",
+      tagline: "Reference architecture",
+      github_url: "https://github.com/SevDev21/disney-ai-plus",
+    },
+    {
+      slug: "test-2",
+      name: "Test Project 2",
+      summary:
+        "Sandbox workspace used to experiment with the ArchAiTect Workbench features.",
+      tagline: "Sandbox",
+    },
+  ];
+
+  // Always default to the Workbench API, unless explicitly overridden.
   const API_BASE =
     cfg.API_BASE ||
     window.__WB_API_BASE ||
-    (typeof window !== 'undefined' ? new URL('/', window.location.origin).href : DEFAULT_API);
+    DEFAULT_API;
 
   async function fetchProjects() {
     const bust = Date.now().toString();
-    const url = (API_BASE.replace(/\/+$/, '')) + '/api/projects?_bust=' + bust;
-    const resp = await fetch(url, { credentials: 'omit', cache: 'no-store', mode: 'cors' });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const url =
+      API_BASE.replace(/\/+$/, "") +
+      "/api/projects?_bust=" +
+      encodeURIComponent(bust);
+
+    const resp = await fetch(url, {
+      // Do NOT send cookies/credentials cross-origin. This avoids the
+      // browser enforcing Access-Control-Allow-Credentials: true.
+      credentials: "omit",
+      cache: "no-store",
+      mode: "cors",
+    });
+
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
     return await resp.json();
   }
 
-  function renderProjects(items) {
-    const host = document.getElementById('wb-projects');
+  function showErrorFor(hostId, msg) {
+    const host = document.getElementById(hostId);
     if (!host) return;
-    const ul = document.createElement('ul');
-    ul.style.listStyle = 'disc';
-    ul.style.paddingLeft = '1.25rem';
+    host.innerHTML =
+      '<p style="color:#b00020">' +
+      (msg || "Could not load projects from Workbench.") +
+      "</p>";
+  }
+
+  // ---- Projects index: simple list ----------------------------------------
+
+  function renderProjectsList(items) {
+    const host = document.getElementById("wb-projects");
+    if (!host) return;
+
+    const ul = document.createElement("ul");
+    ul.style.listStyle = "disc";
+    ul.style.paddingLeft = "1.25rem";
 
     for (const p of items) {
-      const li = document.createElement('li');
-      const a = document.createElement('a');
-      a.textContent = p.name || p.slug || 'Unnamed';
-      // Point to the project page inside docs (relative)
-      a.href = `../projects/${p.slug}/`;
+      const li = document.createElement("li");
+      const a = document.createElement("a");
+      const name =
+        p.name ||
+        p.title ||
+        p.nav_title ||
+        p.project_name ||
+        p.slug ||
+        "Unnamed project";
+      a.textContent = name;
+      a.href = "../projects/" + encodeURIComponent(p.slug) + "/";
       li.appendChild(a);
       ul.appendChild(li);
     }
-    host.innerHTML = '';
+
+    host.innerHTML = "";
     host.appendChild(ul);
   }
 
-  function showError(msg) {
-    const host = document.getElementById('wb-projects');
-    if (host) {
-      host.innerHTML = `<p style="color:#b00020">${msg}</p>`;
-    }
+  // ---- Home page: "Latest projects" cards ---------------------------------
+
+  function pickIconForSlug(slug) {
+    const s = (slug || "").toLowerCase();
+    if (s.includes("disney")) return "🎬";
+    if (s.includes("test")) return "🧪";
+    if (s.includes("auth")) return "🔐";
+    return "🧩";
   }
 
-  document.addEventListener('DOMContentLoaded', async () => {
-    const host = document.getElementById('wb-projects');
+  function renderLatestProjects(items) {
+    const host = document.getElementById("wb-latest-projects");
     if (!host) return;
-    try {
-      const items = await fetchProjects();
-      // newest first if created_at exists
-      items.sort((a, b) => ((b.created_at || '') + (b.slug || ''))
-                          .localeCompare((a.created_at || '') + (a.slug || '')));
-      renderProjects(items);
-    } catch (e) {
-      console.error('projects.js:', e);
-      showError('Could not load projects from Workbench right now.');
+
+    // How many cards to show on the home page
+    const maxAttr = host.getAttribute("data-max");
+    const max = maxAttr ? parseInt(maxAttr, 10) || 2 : 2;
+
+    const latest = items.slice(0, max);
+
+    if (!latest.length) {
+      host.innerHTML = "<p>No projects available yet.</p>";
+      return;
     }
+
+    const container = document.createElement("div");
+    container.className = "latest-projects-grid";
+
+    latest.forEach((p) => {
+      const slug = p.slug;
+      const name =
+        p.name ||
+        p.title ||
+        p.nav_title ||
+        p.project_name ||
+        slug ||
+        "Unnamed project";
+      const summary =
+        p.summary ||
+        p.description ||
+        "Architecture workspace managed by the ArchAiTect Workbench.";
+
+      const icon = pickIconForSlug(slug);
+
+      const card = document.createElement("div");
+      card.className = "project-card";
+
+      const iconDiv = document.createElement("div");
+      iconDiv.className = "project-icon";
+      iconDiv.textContent = icon;
+
+      const bodyDiv = document.createElement("div");
+      bodyDiv.className = "project-body";
+
+      const titleDiv = document.createElement("div");
+      titleDiv.className = "project-title";
+      titleDiv.textContent = name;
+
+      const metaDiv = document.createElement("div");
+      metaDiv.className = "project-meta";
+      metaDiv.textContent =
+        (p.tagline || "Architecture workspace").toUpperCase();
+
+      const textP = document.createElement("p");
+      textP.className = "project-text";
+      textP.textContent = summary;
+
+      const linksDiv = document.createElement("div");
+      linksDiv.className = "project-links";
+
+      const docsBtn = document.createElement("a");
+      docsBtn.className = "md-button md-button--primary";
+      docsBtn.href = "./projects/" + encodeURIComponent(slug) + "/";
+      docsBtn.textContent = "Open project docs";
+
+      linksDiv.appendChild(docsBtn);
+
+      // Optional GitHub link if API provides it
+      if (p.github_url) {
+        const ghBtn = document.createElement("a");
+        ghBtn.className = "md-button md-button--secondary";
+        ghBtn.href = p.github_url;
+        ghBtn.target = "_blank";
+        ghBtn.rel = "noopener";
+        ghBtn.textContent = "GitHub repo";
+        linksDiv.appendChild(ghBtn);
+      }
+
+      bodyDiv.appendChild(titleDiv);
+      bodyDiv.appendChild(metaDiv);
+      bodyDiv.appendChild(textP);
+      bodyDiv.appendChild(linksDiv);
+
+      card.appendChild(iconDiv);
+      card.appendChild(bodyDiv);
+
+      container.appendChild(card);
+    });
+
+    host.innerHTML = "";
+    host.appendChild(container);
+  }
+
+  // ---- Wire everything up -------------------------------------------------
+
+  document.addEventListener("DOMContentLoaded", async () => {
+    const projectsHost = document.getElementById("wb-projects");
+    const latestHost = document.getElementById("wb-latest-projects");
+
+    // If neither exists on this page, don't bother calling the API.
+    if (!projectsHost && !latestHost) return;
+
+    let items = null;
+
+    try {
+      // Try live data first (will fail if Cloudflare blocks CORS).
+      items = await fetchProjects();
+    } catch (e) {
+      console.warn("projects.js: live fetch failed, using static fallback", e);
+    }
+
+    // If the API call failed or returned nothing, fall back to static list.
+    if (!items || !items.length) {
+      items = STATIC_PROJECTS.slice();
+    }
+
+    if (!items || !items.length) {
+      // Only show the red error if we genuinely have no data at all.
+      if (projectsHost)
+        showErrorFor("wb-projects", "Could not load projects from Workbench.");
+      if (latestHost)
+        showErrorFor(
+          "wb-latest-projects",
+          "Could not load latest projects from Workbench."
+        );
+      return;
+    }
+
+    // Sort newest first if created_at exists, otherwise by slug.
+    items.sort((a, b) => {
+      const ak = (a.created_at || "") + (a.slug || "");
+      const bk = (b.created_at || "") + (b.slug || "");
+      return bk.localeCompare(ak);
+    });
+
+    if (projectsHost) renderProjectsList(items);
+    if (latestHost) renderLatestProjects(items);
   });
 })();

@@ -1,7 +1,245 @@
-/* docs/assets/extra.css
- *
- * Keep this file for small visual tweaks only.
- * Layout is handled by the default Material theme.
- */
+/* 2. `docs/assets/extra.css */
+/* ================================
+   ArchAiTect Workbench homepage
+   ================================ */
 
-/* (intentionally left minimal – no header/side-nav overrides) */
+.md-typeset .hero {
+  position: relative;
+  padding: 2.5rem 1.75rem 3rem;
+  margin-bottom: 1.5rem;
+  border-radius: 0.9rem;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  background:
+    radial-gradient(circle at top left, rgba(63, 81, 181, 0.40), transparent 60%),
+    radial-gradient(circle at bottom right, rgba(63, 81, 181, 0.18), transparent 60%);
+  overflow: hidden;
+}
+
+.md-typeset .hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.35;
+  mix-blend-mode: soft-light;
+  background-image: linear-gradient(120deg, rgba(255, 255, 255, 0.15), transparent 55%);
+  pointer-events: none;
+}
+
+.md-typeset .hero-kicker {
+  display: inline-block;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: var(--md-default-fg-color--lighter);
+}
+
+.md-typeset .hero h2 {
+  margin: 0 0 0.4rem;
+}
+
+.md-typeset .hero p {
+  max-width: 40rem;
+  margin-top: 0.4rem;
+}
+
+.md-typeset .hero-cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.md-typeset .hero-primary {
+  background-color: var(--md-primary-fg-color);
+  color: var(--md-primary-bg-color) !important;
+}
+
+.md-typeset .hero-secondary {
+  border: 1px solid var(--md-primary-fg-color);
+}
+
+/* Dark mode adjustments */
+[data-md-color-scheme="slate"] .md-typeset .hero {
+  border-color: var(--md-default-fg-color--lighter);
+  background:
+    radial-gradient(circle at top left, rgba(63, 81, 181, 0.55), transparent 60%),
+    radial-gradient(circle at bottom right, rgba(63, 81, 181, 0.30), transparent 60%);
+}
+
+[data-md-color-scheme="slate"] .md-typeset .hero::after {
+  opacity: 0.45;
+}
+
+/* Stats row */
+
+.md-typeset .stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0.5rem 0 1.5rem;
+}
+
+@media (max-width: 900px) {
+  .md-typeset .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .md-typeset .stats-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.md-typeset .stat-card {
+  padding: 0.9rem 1.0rem;
+  border-radius: 0.7rem;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  background-color: var(--md-default-bg-color);
+}
+
+[data-md-color-scheme="slate"] .md-typeset .stat-card {
+  background-color: rgba(255, 255, 255, 0.03);
+  border-color: var(--md-default-fg-color--lighter);
+}
+
+.md-typeset .stat-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.md-typeset .stat-label {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--md-default-fg-color--light);
+  margin-top: 0.3rem;
+}
+
+/* Latest projects (stacked vertically) */
+
+.md-typeset .latest-projects-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  margin: 0.75rem 0 1.75rem;
+  max-width: 40rem;          /* keep cards from stretching too wide */
+}
+
+/* Individual project card */
+.md-typeset .project-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  border-radius: 0.9rem;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  background-color: var(--md-default-bg-color);
+}
+
+[data-md-color-scheme="slate"] .md-typeset .project-card {
+  background-color: rgba(255, 255, 255, 0.02);
+  border-color: var(--md-default-fg-color--lighter);
+}
+
+/* Emoji / icon on the left */
+.md-typeset .project-icon {
+  font-size: 2.2rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+/* Main content column */
+.md-typeset .project-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+}
+
+/* Title + meta */
+.md-typeset .project-title {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.md-typeset .project-meta {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--md-default-fg-color--lighter);
+  margin-top: 0.1rem;
+}
+
+/* Summary text */
+.md-typeset .project-text {
+  margin: 0.6rem 0 0.9rem;
+}
+
+/* Button row */
+.md-typeset .project-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.md-typeset .project-links .md-button {
+  margin: 0;
+}
+
+/* Visual pipeline row */
+
+.md-typeset .pipeline-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: stretch;
+  margin: 0.75rem 0 1.75rem;
+}
+
+.md-typeset .pipeline-step {
+  flex: 1 1 10rem;
+  min-width: 10rem;
+  padding: 1rem 1.1rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  background-color: var(--md-default-bg-color);
+}
+
+[data-md-color-scheme="slate"] .md-typeset .pipeline-step {
+  background-color: rgba(255, 255, 255, 0.02);
+  border-color: var(--md-default-fg-color--lighter);
+}
+
+.md-typeset .pipeline-badge {
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  font-weight: 700;
+  background-color: var(--md-primary-fg-color);
+  color: var(--md-primary-bg-color);
+  margin-bottom: 0.35rem;
+}
+
+.md-typeset .pipeline-title {
+  font-weight: 700;
+  margin-bottom: 0.15rem;
+}
+
+.md-typeset .pipeline-text {
+  font-size: 0.85rem;
+  color: var(--md-default-fg-color--light);
+}
+
+.md-typeset .pipeline-arrow {
+  align-self: center;
+  font-size: 1.4rem;
+  opacity: 0.6;
+}

@@ -1,57 +1,171 @@
-# ArchAiTect Workbench Docs
+# ArchAiTect Workbench
 
-This site is the documentation front-end for the **ArchAiTect Workbench**.
+<div class="hero">
 
-The flow looks like this:
+<span class="hero-kicker">AI-assisted architecture → living documentation</span>
 
-1. You create or update a project in the Workbench UI at `https://workbench.shafie.org/`.
-2. The Workbench writes package docs and diagram stubs into the `docs/` tree under `/projects/<slug>/`.
-3. MkDocs Material builds those files and serves them here at `https://docs.shafie.org/`.
+<h2>Design systems once. Watch the docs, diagrams, and code stay in sync.</h2>
 
-Use the **Projects** section in the left navigation to jump straight into a project workspace.
+<p>
+Start in the <strong>Workbench UI</strong>, generate architecture docs &amp; diagrams,
+and consume them here in a clean, versioned documentation hub — backed by GitHub for real development work.
+</p>
 
----
+<div class="hero-cta-row">
+  <a class="md-button hero-primary" href="https://workbench.shafie.org/" target="_blank" rel="noopener">
+    Open Workbench
+  </a>
+  <a class="md-button hero-secondary" href="./projects/">
+    View projects
+  </a>
+</div>
 
-## Live endpoints
-
-- **Workbench UI:** `https://workbench.shafie.org/`
-- **Open WebUI (chat frontend):** {{ config.extra.endpoints.openwebui }}
-- **Kroki (diagram as a service):** {{ config.extra.endpoints.kroki }}
-- **PlantUML server:** {{ config.extra.endpoints.plantuml }}
-- **MkDocs (this site):** `https://docs.shafie.org/`
-
-All of these run inside the same self-hosted stack and are wired together by the Workbench backend.
-
----
-
-## What we're building
-
-- **Self-hosted AI workbench** for architecture docs & diagrams  
-  - Projects and briefs are managed via the FastAPI Workbench (`workbench.shafie.org`).
-  - Diagrams and specs are generated into this MkDocs site.
-- **Diagramming:**
-  - Mermaid (inline in Markdown).
-  - Kroki + PlantUML for richer sequence/deployment/UML diagrams.
-- **Canonical knowledge base:**
-  - Each project lives under `/projects/<slug>/` with:
-    - Package docs (Spec, SRS, Reference Architecture, Implementation Guide).
-    - A `diagrams/` area for C4 / sequence / deployment diagrams.
+</div>
 
 ---
 
-## Stack at a glance
+## At a glance
 
-- **Docs:** MkDocs + Material theme (this site)
-- **AI & prompts:** Open WebUI ↔ Ollama (LLM backend)
-- **Workbench API:** FastAPI app that owns projects, briefs, and generators
-- **Diagram rendering:** Kroki + PlantUML containers
-- **Reverse proxy / TLS:** Cloudflared tunnel + Nginx / TLS endpoints
-- **Infra:** Docker Compose
+<div class="stats-grid">
+
+<div class="stat-card">
+  <div class="stat-value">2</div>
+  <div class="stat-label">Active projects</div>
+</div>
+
+<div class="stat-card">
+  <div class="stat-value">10+</div>
+  <div class="stat-label">Generated diagrams</div>
+</div>
+
+<div class="stat-card">
+  <div class="stat-value">8</div>
+  <div class="stat-label">Core architecture docs</div>
+</div>
+
+<div class="stat-card">
+  <div class="stat-value">1</div>
+  <div class="stat-label">Unified AI workbench</div>
+</div>
+
+</div>
 
 ---
 
-## Next steps
+## Start here
 
-- Create a project in the Workbench and save a brief.
-- Run the generators so package docs & diagram stubs are written under `/docs/projects/<slug>/`.
-- Commit & deploy the updated docs so they appear automatically under **Projects** in this site.
+### 1. Create or open a project in the Workbench
+Go to [https://workbench.shafie.org/](https://workbench.shafie.org/){ target="_blank" rel="noopener" } and create a project (or open an existing one).
+Use AI-assisted briefs to describe the product, constraints, and quality attributes.
+
+### 2. Generate architecture docs & diagrams
+From the Workbench, trigger generation of:
+
+&nbsp;&nbsp;&nbsp;&nbsp;Spec &amp; SRS  
+&nbsp;&nbsp;&nbsp;&nbsp;Reference Architecture  
+&nbsp;&nbsp;&nbsp;&nbsp;Implementation Guide  
+&nbsp;&nbsp;&nbsp;&nbsp;C4, sequence, and deployment diagrams  
+
+### 3. Consume the artifacts in two places
+
+&nbsp;&nbsp;&nbsp;&nbsp;**Docs (this site)** – for browsable, internal documentation  
+&nbsp;&nbsp;&nbsp;&nbsp;→ See **Projects** in the left nav to jump into a project.  
+
+&nbsp;&nbsp;&nbsp;&nbsp;**GitHub** – for code-centric collaboration  
+&nbsp;&nbsp;&nbsp;&nbsp;→ [`SevDev21/disney-ai-plus`](https://github.com/SevDev21/disney-ai-plus)
+
+---
+
+## Architecture → Stories → Code
+
+The Workbench is designed around a simple pipeline:
+
+### 1. Architect
+&nbsp;&nbsp;&nbsp;&nbsp;Defines the system using briefs, requirements, and diagrams.  
+&nbsp;&nbsp;&nbsp;&nbsp;Publishes architecture artifacts to MkDocs and to the GitHub repo.
+
+### 2. Product Owner
+&nbsp;&nbsp;&nbsp;&nbsp;Uses the specs and diagrams to derive user stories and backlog items.  
+&nbsp;&nbsp;&nbsp;&nbsp;Stores and manages those stories alongside the repo.
+
+### 3. Developer
+&nbsp;&nbsp;&nbsp;&nbsp;Implements features and tests based on those stories.  
+&nbsp;&nbsp;&nbsp;&nbsp;Uses the docs &amp; diagrams here as the source of truth for behavior and design.
+
+---
+
+## Visual pipeline
+
+<div class="pipeline-row">
+
+  <div class="pipeline-step">
+    <div class="pipeline-badge">1</div>
+    <div class="pipeline-title">Workbench</div>
+    <div class="pipeline-text">
+      Create or refine a project brief, capture requirements, and choose which diagrams to generate.
+    </div>
+  </div>
+
+  <div class="pipeline-arrow">→</div>
+
+  <div class="pipeline-step">
+    <div class="pipeline-badge">2</div>
+    <div class="pipeline-title">Generators</div>
+    <div class="pipeline-text">
+      Produce specs, SRS, reference architecture, implementation guides, and C4/sequence/deployment diagrams.
+    </div>
+  </div>
+
+  <div class="pipeline-arrow">→</div>
+
+  <div class="pipeline-step">
+    <div class="pipeline-badge">3</div>
+    <div class="pipeline-title">Docs &amp; GitHub</div>
+    <div class="pipeline-text">
+      Publish to this MkDocs site for human-friendly browsing, and to GitHub for code-centric collaboration.
+    </div>
+  </div>
+
+  <div class="pipeline-arrow">→</div>
+
+  <div class="pipeline-step">
+    <div class="pipeline-badge">4</div>
+    <div class="pipeline-title">Stories &amp; Code</div>
+    <div class="pipeline-text">
+      Product owners derive stories, developers implement and test, all backed by the same canonical architecture.
+    </div>
+  </div>
+
+</div>
+
+---
+
+## Latest projects
+
+A quick snapshot of what’s currently flowing through the Workbench.
+
+<div id="wb-latest-projects" class="latest-projects-grid" data-max="2">
+  <p>Loading latest projects…</p>
+</div>
+
+---
+
+## Live system endpoints
+
+These components make up the self-hosted stack:
+
+- **Workbench UI:** <https://workbench.shafie.org/>  
+- **Open WebUI (chat frontend):** {{ config.extra.endpoints.openwebui }}  
+- **Kroki (diagram as a service):** {{ config.extra.endpoints.kroki }}  
+- **PlantUML server:** {{ config.extra.endpoints.plantuml }}  
+- **MkDocs (this site):** <https://docs.shafie.org/>
+
+---
+
+## Where to go next
+
+Create or open a project in the Workbench  
+
+Browse an existing project under **Projects** in the left navigation  
+
+Open the GitHub repo to see how architecture, stories, and code stay in sync
