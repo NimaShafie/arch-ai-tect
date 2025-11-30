@@ -4,14 +4,20 @@ from pathlib import Path
 import re
 import zlib
 import html
+import os
+from urllib.request import urlopen
+from urllib.error import URLError, HTTPError
 
 from server.services.mkdocs_nav import build_nav
 
 # Where all per-project docs live, relative to repo root
 PROJECTS_ROOT = Path("docs") / "projects"
 
-# PlantUML server base for direct links (HTML viewer + PNG image)
+# PlantUML server base for public links (HTML viewer + PNG image)
 PLANTUML_SERVER_BASE = "https://uml.shafie.org"
+
+# Optional override for the *pipeline* PNG fetches (internal PlantUML)
+PIPELINE_PLANTUML_BASE = os.getenv("PIPELINE_PLANTUML_BASE", PLANTUML_SERVER_BASE)
 
 # Files we expect under each project, grouped by section
 # NOTE: these names are aligned with docs/projects/*/package
@@ -201,15 +207,16 @@ def _requirements_bullets_from_plantuml(
             f"and implementation must ensure that all shown components, connections, and "
             f"responsibilities are realized in code, configuration, and infrastructure."
         )
-        bullets.append(
-            "- The development team shall treat each visual element as either a deployable "
-            "artifact, a runtime capability, or an integration point, and create tasks to "
-            "build, configure, and test each of them."
-        )
-        bullets.append(
-            "- Non-functional requirements (performance, security, observability, "
-            "resilience) must be applied to all links and components shown in the diagram."
-        )
+
+    bullets.append(
+        "- The development team shall treat each visual element as either a deployable "
+        "artifact, a runtime capability, or an integration point, and create tasks to "
+        "build, configure, and test each of them."
+    )
+    bullets.append(
+        "- Non-functional requirements (performance, security, observability, "
+        "resilience) must be applied to all links and components shown in the diagram."
+    )
 
     return bullets
 
@@ -231,7 +238,46 @@ def _generate_requirements_from_plantuml(
     )
 
 
-# --- PlantUML → Mermaid helpers ----------------------------------------------
+# --- PlantUML → PNG helper for pipeline --------------------------------------
+
+
+def save_pipeline_png_from_body(body: str, dest: Path) -> None:
+    """
+    For pipeline exports only:
+
+    - Find the first PlantUML block in the markdown body
+    - Encode it
+    - Download the PNG from the PlantUML server
+    - Save it to 'dest'
+
+    Any network / HTTP errors are logged to stdout and silently ignored so that
+    the pipeline still succeeds and at least the markdown/requirements update.
+    """
+    match = _PLANTUML_BLOCK_RE.search(body)
+    if not match:
+        return
+
+    code = match.group(1).strip()
+    if not code:
+        return
+
+    encoded = encode_plantuml(code)
+
+    # Use the pipeline-specific base (internal PlantUML) so we don't hit
+    # Cloudflare challenges from the backend service.
+    png_url = f"{PIPELINE_PLANTUML_BASE}/png/{encoded}"
+
+    try:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        with urlopen(png_url, timeout=20) as resp:
+            data = resp.read()
+        dest.write_bytes(data)
+    except (URLError, HTTPError, TimeoutError, OSError) as exc:
+        # Soft-fail: don't break the pipeline on image download problems
+        print(f"[pipeline] WARNING: failed to fetch PNG from {png_url}: {exc}")
+
+
+# --- PlantUML → Mermaid helpers (for Workbench diagrams view) ----------------
 
 
 def _is_sequence_diagram(code: str) -> bool:
@@ -361,9 +407,7 @@ def _plantuml_class_to_mermaid(code: str) -> str:
             continue
 
         # Association with cardinalities: User "1" -- "*" Subscription
-        m = re.match(
-            r"(\w+)\s+\"([^\"]*)\"\s+--\s+\"([^\"]*)\"\s+(\w+)", ln
-        )
+        m = re.match(r"(\w+)\s+\"([^\"]*)\"\s+--\s+\"([^\"]*)\"\s+(\w+)", ln)
         if m:
             src, left_card, right_card, dst = m.groups()
             relations.append(
@@ -554,61 +598,62 @@ def _inject_plantuml_link(body: str, section_title: str | None = None) -> str:
 
 
 def build_pipeline_diagram_markdown(
-    body: str, section_title: str, project_slug: str
+    body: str,
+    section_title: str,
+    project_slug: str,
+    image_rel_path: Path | None = None,
 ) -> str:
     """
     Build the GitHub-friendly diagram page:
 
       # Title
       [Open in PlantUML](...)
-      ```mermaid ...```  (when possible)
+      ![Diag](images/...)  (if image_rel_path provided)
       ## Requirements
       ...
       ---
       _Source: generated from ArchAiTect Workbench(...)
 
-    No PNG image is embedded here so GitHub never shows a broken image icon.
+    If image_rel_path is None, we fall back to PlantUML PNG URLs so that the
+    page is still usable even if offline PNG generation failed for some reason.
     """
     match = _PLANTUML_BLOCK_RE.search(body)
-    if not match:
-        source_url = f"https://workbench.shafie.org/projects/{project_slug}/"
-        out = [
-            f"# {section_title}",
-            "",
-            body.strip(),
-            "",
-            "---",
-            "",
-            f"_Source: generated from "
-            f"[ArchAiTect Workbench]({source_url})_",
-            "",
-        ]
-        return "\n".join(out)
+    if match:
+        code = match.group(1).strip()
+    else:
+        code = ""
 
-    code = match.group(1).strip()
-    encoded = encode_plantuml(code)
-    viewer_url = f"{PLANTUML_SERVER_BASE}/uml/{encoded}"
+    encoded = encode_plantuml(code) if code else ""
+    viewer_url = (
+        f"{PLANTUML_SERVER_BASE}/uml/{encoded}" if encoded else ""
+    )
+    png_url = (
+        f"{PLANTUML_SERVER_BASE}/png/{encoded}" if encoded else ""
+    )
 
-    mermaid = plantuml_to_mermaid(code)
-    bullets = _requirements_bullets_from_plantuml(code, section_title)
+    bullets = _requirements_bullets_from_plantuml(code or "", section_title)
     source_url = f"https://workbench.shafie.org/projects/{project_slug}/"
 
     out: list[str] = []
     out.append(f"# {section_title}")
     out.append("")
-    out.append(f"[Open in PlantUML]({viewer_url})")
-    out.append("")
 
-    if mermaid:
-        out.append("```mermaid")
-        out.append(mermaid)
-        out.append("```")
+    if viewer_url:
+        out.append(f"[Open in PlantUML]({viewer_url})")
         out.append("")
     else:
-        # Fallback text when we can't render a Mermaid preview
-        out.append(
-            "_Diagram preview unavailable; see PlantUML source via the link above._"
-        )
+        out.append("_No PlantUML source detected for this diagram._")
+        out.append("")
+
+    alt_label = f"{section_title} diagram"
+
+    if image_rel_path is not None:
+        # Preferred: local PNG inside the Disney repo
+        out.append(f"![{alt_label}]({image_rel_path.as_posix()})")
+        out.append("")
+    elif png_url:
+        # Fallback: render directly from PlantUML server
+        out.append(f"![{alt_label}]({png_url})")
         out.append("")
 
     out.append("## Requirements")

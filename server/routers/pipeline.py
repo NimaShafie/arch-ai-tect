@@ -12,6 +12,7 @@ from server.services.run_build_nav import (
     DIAGRAM_FILES,
     _read_without_leading_title,
     build_pipeline_diagram_markdown,
+    save_pipeline_png_from_body,
 )
 
 router = APIRouter(prefix="/api/projects", tags=["pipeline"])
@@ -157,7 +158,40 @@ def _export_to_pipeline(slug: str) -> dict:
         if not body_clean:
             continue
 
-        rendered = build_pipeline_diagram_markdown(body_clean, section_title, slug)
+        # Determine image file name and paths for this diagram
+        stem = Path(filename).stem  # e.g. "c4_component"
+        image_name = stem.replace("_", "-") + "-diagram.png"
+
+        # Where the PNG lives on disk inside the Disney repo:
+        disk_image_rel = Path("docs") / "diagrams" / slug / "images" / image_name
+        disk_image_abs = pipeline_repo_dir / disk_image_rel
+
+        # Try to fetch and save the PNG; soft-fail on errors
+        try:
+            save_pipeline_png_from_body(body_clean, disk_image_abs)
+        except Exception as exc:  # noqa: BLE001
+            print(
+                f"[pipeline] WARNING: error saving PNG for {slug}/{filename}: {exc}"
+            )
+
+        # If the PNG exists on disk, use a *relative* path from the markdown
+        # file's directory: images/<name>.png. Otherwise, fall back to the
+        # remote PlantUML PNG URL (image_rel_path=None).
+        if disk_image_abs.exists():
+            md_image_rel = Path("images") / image_name
+            rendered = build_pipeline_diagram_markdown(
+                body_clean,
+                section_title,
+                slug,
+                image_rel_path=md_image_rel,
+            )
+        else:
+            rendered = build_pipeline_diagram_markdown(
+                body_clean,
+                section_title,
+                slug,
+                image_rel_path=None,
+            )
 
         dst_rel = Path("docs") / "diagrams" / slug / filename
         dst_abs = pipeline_repo_dir / dst_rel
@@ -172,7 +206,7 @@ def _export_to_pipeline(slug: str) -> dict:
         status_before = _git(["status", "--porcelain"], cwd=pipeline_repo_dir)
         has_content_changes = bool(status_before.strip())
 
-        # Stage docs (architecture + diagrams)
+        # Stage docs (architecture + diagrams + images)
         _git(["add", "docs/architecture", "docs/diagrams"], cwd=pipeline_repo_dir)
 
         # Always create a commit; allow-empty when there are no content changes
@@ -230,7 +264,7 @@ async def send_to_pipeline(slug: str):
     Export the latest architecture + diagrams for a project into the
     Disney+ pipeline repo and push a commit.
 
-    The behavior is unchanged; this POST endpoint is what the UI already calls.
+    The behavior is unchanged; this POST endpoint is what the Workbench UI uses.
     """
     return _export_to_pipeline(slug)
 

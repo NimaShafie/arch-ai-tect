@@ -104,7 +104,9 @@ services:
     image: plantuml/plantuml-server:jetty
     container_name: plantuml
     restart: unless-stopped
-    ports: ["${PLANTUML_PORT:-18080}:8080"]
+    # CHANGED: expose PlantUML on host 8080 so PIPELINE_PLANTUML_BASE=http://127.0.0.1:8080 works
+    ports:
+      - "8080:8080"
     networks: [proxy]
 
   webhook:
