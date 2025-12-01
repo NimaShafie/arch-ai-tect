@@ -108,3 +108,7 @@ docs/projects/_nav.generated.yml
 !/docs/projects/.keep
 !/docs/projects/index.md
 !/docs/projects/_nav.generated.yml
+
+# ignore .md files that are auto generate and updated
+!docs/projects/index.md
+!docs/_generated_projects_nav.yml
