@@ -2,6 +2,8 @@
 
 from pathlib import Path
 import shutil
+import subprocess
+import sys
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
@@ -21,6 +23,35 @@ router = APIRouter(tags=["ui"])
 
 # Base path to docs/ so we can clean up per-project folders on delete
 DOCS_ROOT = Path(__file__).resolve().parents[2] / "docs"
+REPO_ROOT = DOCS_ROOT.parent
+
+
+def _trigger_docs_refresh() -> None:
+    """
+    Best-effort: run the same nav/index builder you currently call manually.
+
+    This invokes:
+        python -m server.services.run_build_nav
+
+    which rebuilds the MkDocs project nav + combined project index pages.
+    Any errors are swallowed so the UI doesn't break if docs rebuild fails.
+    """
+    try:
+        subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "server.services.run_build_nav",
+            ],
+            cwd=str(REPO_ROOT),
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        # Don't break project create/delete flows if docs rebuild fails.
+        # You can still run the command manually if needed.
+        pass
 
 
 # ---------------------------------------------------------------------
@@ -146,11 +177,14 @@ def api_create_project(payload: ProjectCreate, session=Depends(get_session)):
     session.commit()
     session.refresh(project)
 
-    # Optional: regenerate nav; failures here should NOT break project creation.
+    # Optional: regenerate nav (existing behavior)
     try:
         build_nav()
     except Exception:
         pass
+
+    # NEW: best-effort full docs refresh (projects index + per-project index)
+    _trigger_docs_refresh()
 
     return {
         "status": "ok",
@@ -194,10 +228,13 @@ def api_delete_project(slug: str, session=Depends(get_session)):
         # Don't block deletion on filesystem issues
         pass
 
-    # Best-effort: regenerate MkDocs nav
+    # Existing: regenerate MkDocs nav
     try:
         build_nav()
     except Exception:
         pass
+
+    # NEW: also rebuild combined project index pages so docs site updates
+    _trigger_docs_refresh()
 
     return {"status": "ok", "slug": slug}

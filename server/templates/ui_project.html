@@ -1,266 +1,529 @@
-{# server/templates/ui_project.html #}
+<!-- server/templates/ui_project.html -->
 {% extends "base.html" %}
-{% block title %}{{ project.name }} · ArchAiTect{% endblock %}
+{% block title %}{{ project.name }} · Workbench{% endblock %}
 
 {% block content %}
-  <section class="card" style="margin-bottom:24px">
-    <div class="bd" style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap">
-      <div>
-        <div style="font-size:28px; font-weight:800">{{ project.name }}</div>
-        <div class="muted">slug: <code>{{ project.slug }}</code></div>
-        <div class="row" style="margin-top:12px">
-          <a class="pill" href="{{ docs_urls.project_home }}">Project Docs Home</a>
-          <a class="pill" href="{{ docs_urls.package_spec }}">Spec</a>
-          <a class="pill" href="{{ docs_urls.package_srs }}">SRS</a>
-          <a class="pill" href="{{ docs_urls.package_ref_arch }}">Reference Architecture</a>
-          <a class="pill" href="{{ docs_urls.package_impl_guide }}">Implementation Guide</a>
-        </div>
-      </div>
-      <div class="row" style="gap:8px; flex-wrap:wrap; justify-content:flex-end">
-        <a class="pill pill-secondary" href="{{ url_for('ui.list_projects') }}">All Projects</a>
-        <button
-          type="button"
-          class="pill pill-primary"
-          onclick="awSendToPipeline('{{ project.slug }}', '{{ pipeline_url }}')"
-        >
-          Send latest docs & diagrams to pipeline
-        </button>
-      </div>
-    </div>
-  </section>
+<div class="shell" style="padding-bottom:60px;">
 
-  <section class="card">
-    <div class="bd" style="display:flex; gap:32px; align-items:flex-start; flex-wrap:wrap">
-      <div style="flex:1 1 260px; min-width:240px">
-        <h2 style="margin-top:0; font-size:22px">Project overview</h2>
-        <p class="muted">
-          This is the architecture workspace for this project.
-        </p>
+  <!-- Lightweight spinner + toast styles (no layout changes) -->
+  <style>
+    .btn-busy {
+      position: relative;
+      pointer-events: none;
+      opacity: 0.8;
+      /* extra padding so the spinner never collides with the label text */
+      padding-right: 30px !important;
+    }
+    .btn-busy::after {
+      content: "";
+      position: absolute;
+      right: 10px;
+      width: 14px;
+      height: 14px;
+      border-radius: 999px;
+      border: 2px solid rgba(255,255,255,0.45);
+      border-top-color: #ffffff;
+      animation: ui-spin 0.6s linear infinite;
+    }
+    @keyframes ui-spin {
+      to { transform: rotate(360deg); }
+    }
 
-        <h3 style="margin-top:24px; font-size:18px">Package</h3>
-        <ul class="list-plain">
-          <li><a href="{{ docs_urls.package_spec }}">Architecture Spec</a></li>
-          <li><a href="{{ docs_urls.package_srs }}">Software Requirements Spec</a></li>
-          <li><a href="{{ docs_urls.package_ref_arch }}">Reference Architecture</a></li>
-          <li><a href="{{ docs_urls.package_impl_guide }}">Implementation Guide</a></li>
-        </ul>
+    #toastRoot {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 8px;
+    }
+    .toast {
+      background: #111827;
+      color: #f9fafb;
+      padding: 8px 12px;
+      border-radius: 8px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+      font-size: 13px;
+      max-width: 280px;
+      transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+    .toast-success { background: #065f46; }
+    .toast-error { background: #991b1b; }
+  </style>
 
-        <h3 style="margin-top:24px; font-size:18px">Diagrams</h3>
-        <ul class="list-plain">
-          <li><a href="{{ docs_urls.diagram_c4_context }}">C4 Context</a></li>
-          <li><a href="{{ docs_urls.diagram_c4_container }}">C4 Container</a></li>
-          <li><a href="{{ docs_urls.diagram_c4_component }}">C4 Component</a></li>
-          <li><a href="{{ docs_urls.diagram_logical }}">Logical View</a></li>
-          <li><a href="{{ docs_urls.diagram_deployment }}">Deployment View</a></li>
-          <li><a href="{{ docs_urls.diagram_sequence }}">Sequence Diagram</a></li>
-        </ul>
-      </div>
+  <!-- Toast container -->
+  <div id="toastRoot"></div>
 
-      <div style="flex:2 1 420px; min-width:320px">
-        <h2 style="margin-top:0; font-size:22px">Artifacts</h2>
-        <p class="muted">
-          Use the links on the left to view the generated architecture docs and diagrams.
-          When you are ready, send everything to the downstream pipeline using the button above.
-        </p>
+  <!-- Header -->
+  <div style="margin-bottom:20px;">
+    <h1 class="h1" style="margin-bottom:4px;">{{ project.name }}</h1>
+    <p class="muted" style="margin-bottom:16px;">Project workspace for {{ project.slug }}</p>
 
-        <h3 style="margin-top:24px; font-size:18px">Docs location</h3>
-        <pre style="background:#f5f5f5; padding:8px 12px; border-radius:6px; overflow:auto">
-{{ project.docs_root }}</pre>
-
-        <h3 style="margin-top:24px; font-size:18px">GitHub export</h3>
-        <p class="muted">
-          The pipeline will push updates into your GitHub repository for this project.
-        </p>
-        {% if project.github_repo %}
-          <p>
-            Repository:
-            <a href="{{ project.github_repo }}" target="_blank" rel="noopener">
-              {{ project.github_repo }}
-            </a>
-          </p>
-        {% else %}
-          <p class="muted">
-            No GitHub repository is configured yet for this project.
-          </p>
-        {% endif %}
-      </div>
-    </div>
-  </section>
-
-  {# Simple modal used for pipeline feedback #}
-  <div id="aw-pipeline-modal" class="modal-backdrop" style="display:none">
-    <div class="modal">
-      <div class="modal-header">
-        <div class="modal-title">Pipeline Status</div>
-      </div>
-      <div class="modal-body">
-        <div id="aw-pipeline-status" class="muted">
-          Triggering the pipeline for this project…
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="pill" onclick="awHideModal('aw-pipeline-modal')">
-          Close
-        </button>
-      </div>
+    <!-- Docs pill nav → hard-pointed to MkDocs host -->
+    <div style="display:flex; flex-wrap:wrap; gap:8px;">
+      <a href="https://docs.shafie.org/projects/{{ project.slug }}/"
+         target="_blank" class="btn pill">Project Docs Home</a>
+      <a href="https://docs.shafie.org/projects/{{ project.slug }}/package/spec/"
+         target="_blank" class="btn pill">Spec</a>
+      <a href="https://docs.shafie.org/projects/{{ project.slug }}/package/srs/"
+         target="_blank" class="btn pill">SRS</a>
+      <a href="https://docs.shafie.org/projects/{{ project.slug }}/package/reference-arch/"
+         target="_blank" class="btn pill">Reference Architecture</a>
+      <a href="https://docs.shafie.org/projects/{{ project.slug }}/package/implementation-guide/"
+         target="_blank" class="btn pill">Implementation Guide</a>
+      <a href="https://docs.shafie.org/projects/{{ project.slug }}/diagrams/"
+         target="_blank" class="btn pill">Diagrams</a>
     </div>
   </div>
 
-  <style>
-    /* Keep existing look; only ensure modal-backdrop works consistently */
-    .modal-backdrop{
-      position:fixed;
-      inset:0;
-      background:rgba(15,23,42,0.35);
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      z-index:999;
-    }
-    .modal{
-      background:#fff;
-      border-radius:8px;
-      box-shadow:0 18px 45px rgba(15,23,42,0.25);
-      max-width:480px;
-      width:100%;
-      padding:16px 20px 12px;
-    }
-    .modal-header{
-      margin-bottom:8px;
-    }
-    .modal-title{
-      font-size:18px;
-      font-weight:700;
-    }
-    .modal-body{
-      font-size:14px;
-      line-height:1.5;
-      margin-bottom:12px;
-    }
-    .modal-footer{
-      display:flex;
-      justify-content:flex-end;
-    }
-  </style>
+  <!-- Mini tutorial / workflow helper -->
+  <section class="card" style="margin-bottom:20px;">
+    <div style="padding:18px 22px;">
+      <h2 class="h2" style="margin-bottom:6px; font-size:1rem; font-weight:700;">Workflow overview</h2>
+      <p class="muted" style="margin-bottom:10px;">
+        Follow these steps in order to go from a raw idea to generated diagrams and docs:
+      </p>
+      <ol style="margin:0; padding-left:18px; font-size:0.95rem; color:var(--text, #222);">
+        <li style="margin-bottom:4px;">
+          <strong>Requirements Brief</strong> — Describe your system in plain English, then click
+          <em>Interpret with AI</em>. Review / edit the generated brief JSON and click <em>Save Brief</em>.
+        </li>
+        <li style="margin-bottom:4px;">
+          <strong>Generate Architecture</strong> — Choose which diagrams to generate and click
+          <em>Generate Diagrams</em>. This uses the saved brief as input.
+        </li>
+        <li>
+          <strong>View Output</strong> — Open the generated documentation and diagrams via
+          <em>View Documentation</em>.
+        </li>
+      </ol>
+    </div>
+  </section>
 
-  <script>
-    function awShowModal(id){
-      var el = document.getElementById(id);
-      if(el){ el.style.display = 'flex'; }
-    }
-    function awHideModal(id){
-      var el = document.getElementById(id);
-      if(el){ el.style.display = 'none'; }
-    }
+  <!-- Two-column layout: left = brief, right = generate + view -->
+  <div style="display:flex; gap:24px; align-items:stretch;">
 
-    function awEscapeHtml(str){
-      if(str == null){ return ''; }
-      return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
+    <!-- LEFT: REQUIREMENTS BRIEF -->
+    <section class="card" style="flex:1.35;">
+      <div style="padding:24px 28px; height:100%; box-sizing:border-box;">
+        <h2 class="h1" style="margin-bottom:10px;">1. Requirements Brief</h2>
+
+        <p class="muted" style="margin-bottom:16px;">
+          Describe your system, key users, major flows, constraints, expectations, and tech preferences.
+          The AI will interpret this and generate a structured brief for the rest of the toolchain.
+        </p>
+
+        <label class="muted" for="briefPrompt" style="display:block; margin-bottom:6px;">
+          Describe your system
+        </label>
+        <textarea
+          id="briefPrompt"
+          class="input"
+          placeholder="For example: a streaming platform where users can sign in, manage profiles, browse a catalog, and start video playback..."
+          style="min-height:140px; padding:10px 12px; resize:vertical;"
+        ></textarea>
+
+        <div style="margin-top:14px;">
+          <button
+            id="interpretBtn"
+            class="btn primary"
+            style="display:inline-flex; align-items:center; justify-content:center; padding:10px 18px;"
+          >
+            Interpret with AI
+          </button>
+        </div>
+
+        <p id="interpretStatus" class="muted" style="margin-top:10px; min-height:18px;"></p>
+
+        <h3 style="margin-top:22px; margin-bottom:8px; font-size:1rem; font-weight:600;">
+          Generated Brief (edit if needed)
+        </h3>
+        <textarea
+          id="briefJson"
+          class="input"
+          style="min-height:260px; font-family:monospace; padding:10px 12px; resize:vertical;"
+        ></textarea>
+
+        <div style="margin-top:14px;">
+          <button
+            id="saveBriefBtn"
+            class="btn"
+            style="display:inline-flex; align-items:center; justify-content:center; padding:9px 16px;"
+          >
+            Save Brief
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT COLUMN: GENERATE + VIEW OUTPUT -->
+    <div style="flex:1; display:flex; flex-direction:column; gap:24px; height:100%;">
+
+      <!-- Generate Architecture (tile style like previous Diagram Choices) -->
+      <section class="card" id="choices" style="flex:1;">
+        <div class="bd" style="padding:24px 28px; height:100%; box-sizing:border-box; display:flex; flex-direction:column;">
+          <h2 class="h1" style="margin-bottom:10px;">2. Generate Architecture</h2>
+          <p class="muted" style="margin-bottom:16px;">
+            Select which architectural diagrams to generate based on the Requirements Brief.
+          </p>
+
+          <style>
+            #choices .fields {
+              display: grid;
+              grid-template-columns: repeat(2, minmax(200px, 1fr));
+              grid-template-rows: repeat(3, 1fr);
+              gap: 16px 22px;
+              flex: 1;
+              align-content: stretch;
+              width: 100%;
+            }
+            #choices .tile {
+              position: relative;
+              height: 100%;
+              min-height: 96px;
+              border: 1px solid var(--outline, rgba(0,0,0,.08));
+              background: var(--surface-1, #f7f8fb);
+              border-radius: 12px;
+              transition:
+                transform .08s ease,
+                box-shadow .15s ease,
+                border-color .15s ease,
+                background .15s ease;
+              overflow: visible;
+              z-index: 1;
+            }
+            #choices .tile:hover {
+              transform: translateY(-1px);
+              border-color: color-mix(in srgb, var(--primary, #2962ff) 22%, transparent);
+              box-shadow: 0 6px 22px rgba(0,0,0,.07);
+            }
+            #choices .tile-hit {
+              position: absolute;
+              inset: 0;
+              display: flex;
+              align-items: center;
+              gap: 10px;
+              padding: 14px 16px;
+              padding-right: 16px;
+              cursor: pointer;
+              border-radius: 12px;
+            }
+            #choices .tile input[type="checkbox"] {
+              transform: translateY(1px);
+            }
+            #choices .label-text {
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+            }
+          </style>
+
+          <form id="diagramForm" style="display:flex; flex-direction:column; flex:1;">
+            <div class="fields">
+              <div class="tile">
+                <label class="tile-hit">
+                  <input type="checkbox" name="choices" value="c4_context" />
+                  <span class="label-text">C4 Context</span>
+                </label>
+              </div>
+
+              <div class="tile">
+                <label class="tile-hit">
+                  <input type="checkbox" name="choices" value="c4_container" />
+                  <span class="label-text">C4 Container</span>
+                </label>
+              </div>
+
+              <div class="tile">
+                <label class="tile-hit">
+                  <input type="checkbox" name="choices" value="c4_component" />
+                  <span class="label-text">C4 Component</span>
+                </label>
+              </div>
+
+              <div class="tile">
+                <label class="tile-hit">
+                  <input type="checkbox" name="choices" value="sequence" />
+                  <span class="label-text">Sequence</span>
+                </label>
+              </div>
+
+              <div class="tile">
+                <label class="tile-hit">
+                  <input type="checkbox" name="choices" value="deployment" />
+                  <span class="label-text">Deployment</span>
+                </label>
+              </div>
+
+              <div class="tile">
+                <label class="tile-hit">
+                  <input type="checkbox" name="choices" value="logical" />
+                  <span class="label-text">Logical</span>
+                </label>
+              </div>
+            </div>
+
+            <div style="margin-top:12px;">
+              <button
+                class="btn primary"
+                id="generateBtn"
+                style="display:inline-flex; align-items:center; justify-content:center; padding:10px 18px;"
+              >
+                Generate Diagrams
+              </button>
+            </div>
+
+            <p id="genStatus" class="muted" style="margin-top:10px; min-height:18px;"></p>
+          </form>
+        </div>
+      </section>
+
+      <!-- View Output (directly under Generate Architecture) -->
+      <section class="card">
+        <div style="padding:24px 28px;">
+          <h2 class="h1" style="margin-bottom:10px;">3. View Output</h2>
+          <p class="muted" style="margin-bottom:14px;">
+            Browse generated documentation and diagrams rendered via MkDocs and PlantUML/Kroki.
+          </p>
+
+          <a
+            href="https://docs.shafie.org/projects/{{ project.slug }}/"
+            target="_blank"
+            class="btn"
+            style="display:inline-flex; align-items:center; justify-content:center; padding:9px 18px;"
+          >
+            View Documentation
+          </a>
+        </div>
+      </section>
+
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+// Toast helper
+const toastRoot = document.querySelector("#toastRoot");
+function showToast(message, type) {
+  if (!toastRoot) return;
+  const el = document.createElement("div");
+  el.className = "toast" + (type === "error" ? " toast-error" :
+                            type === "success" ? " toast-success" : "");
+  el.textContent = message;
+  toastRoot.appendChild(el);
+  // animate out
+  requestAnimationFrame(() => {
+    el.style.opacity = "1";
+    el.style.transform = "translateY(0)";
+  });
+  setTimeout(() => {
+    el.style.opacity = "0";
+    el.style.transform = "translateY(-4px)";
+  }, 3000);
+  setTimeout(() => el.remove(), 3400);
+}
+
+// track whether we've successfully saved at least once
+let hasSavedBrief = false;
+
+// Load existing brief.json into the editor on page load
+(async () => {
+  try {
+    const r = await fetch("/api/projects/{{ project.slug }}/brief");
+    if (!r.ok) return;
+    const data = await r.json();
+    if (data.brief) {
+      document.querySelector("#briefJson").value =
+        JSON.stringify(data.brief, null, 2);
+      hasSavedBrief = true;
     }
+  } catch (err) {
+    console.error("Failed to load brief:", err);
+  }
+})();
 
-    async function awSendToPipeline(projectSlug, pipelineUrl){
-      var modalId   = 'aw-pipeline-modal';
-      var statusEl  = document.getElementById('aw-pipeline-status');
+// Interpret Requirements with AI
+document.querySelector("#interpretBtn").addEventListener("click", async () => {
+  const btn = document.querySelector("#interpretBtn");
+  const prompt = document.querySelector("#briefPrompt").value.trim();
+  const status = document.querySelector("#interpretStatus");
 
-      if(statusEl){
-        statusEl.textContent = 'Triggering the pipeline for this project…';
+  if (!prompt) {
+    status.textContent = "Enter a prompt first.";
+    return;
+  }
+
+  status.textContent = "Interpreting with AI…";
+  btn.classList.add("btn-busy");
+
+  try {
+    const r = await fetch("/api/projects/{{ project.slug }}/brief/interpret", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt })
+    });
+
+    const contentType = r.headers.get("content-type") || "";
+    let detail = "";
+    if (contentType.includes("application/json")) {
+      const data = await r.json().catch(() => ({}));
+      if (data && data.brief) {
+        document.querySelector("#briefJson").value =
+          JSON.stringify(data.brief, null, 2);
       }
-      awShowModal(modalId);
+      detail = data.detail || "";
+    } else {
+      const text = await r.text().catch(() => "");
+      detail = text ? text.slice(0, 140) + (text.length > 140 ? "…" : "") : "";
+    }
 
-      try{
-        const resp = await fetch(pipelineUrl, {
-          method: 'POST',
-          headers: { 'Accept': 'application/json' },
-          credentials: 'include'
-        });
+    if (!r.ok) {
+      let hint = "";
+      if (r.status >= 500) {
+        hint = " The AI backend returned a server error. Check the API logs and your OpenWebUI / Cloudflare setup.";
+      }
+      throw new Error(
+        `HTTP ${r.status}. ${detail || ""}${hint}`.trim()
+      );
+    }
 
-        const text = await resp.text();
-        let data = null;
-        try{
-          data = text ? JSON.parse(text) : null;
-        }catch(e){
-          data = null;
-        }
+    status.textContent = "AI interpretation complete.";
+  } catch (err) {
+    console.error(err);
+    status.textContent = "Error calling AI: " + err.message;
+  } finally {
+    btn.classList.remove("btn-busy");
+  }
+});
 
-        if(!resp.ok){
-          var msg = 'Pipeline request failed (HTTP ' + resp.status + ').';
-          if(data && data.error){
-            msg += ' ' + data.error;
-          }
-          if(statusEl){
-            statusEl.textContent = msg;
-          }
-          return;
-        }
+// Save brief.json (with toast instead of alert)
+document.querySelector("#saveBriefBtn").addEventListener("click", async () => {
+  const btn = document.querySelector("#saveBriefBtn");
+  const text = document.querySelector("#briefJson").value;
+  const trimmed = text.trim();
 
-        if(!data || typeof data !== 'object'){
-          if(statusEl){
-            statusEl.textContent =
-              'Pipeline call succeeded, but the response was not JSON. ' +
-              'Check your GitHub repo for a new commit.';
-          }
-          return;
-        }
+  if (!trimmed) {
+    showToast("Nothing to save yet. Use 'Interpret with AI' first or paste a brief JSON.", "error");
+    return;
+  }
 
-        // Build a friendly status summary from the JSON payload
-        var html = '';
+  let parsed;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch (e) {
+    showToast("The Generated Brief is not valid JSON. Fix it or re-run 'Interpret with AI'.", "error");
+    console.error(e);
+    return;
+  }
 
-        html += '<p>Pipeline completed for <code>' +
-          awEscapeHtml(data.project || projectSlug) + '</code>.</p>';
+  btn.classList.add("btn-busy");
 
-        html += '<ul style="padding-left:18px; margin:8px 0;">';
-        html += '<li>Status: ' + (data.ok ? 'OK' : 'Error') + '</li>';
+  try {
+    const r = await fetch("/api/projects/{{ project.slug }}/brief", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ brief: parsed })
+    });
 
-        if(typeof data.changed === 'boolean'){
-          html += '<li>Content changes detected: ' +
-            (data.changed ? 'Yes' : 'No') +
-            '</li>';
-        }
+    if (!r.ok) throw new Error(`Failed to save brief (HTTP ${r.status}).`);
+    hasSavedBrief = true;
+    showToast("Brief saved.", "success");
+  } catch (err) {
+    console.error(err);
+    showToast("Save failed: " + err.message, "error");
+  } finally {
+    btn.classList.remove("btn-busy");
+  }
+});
 
-        if(data.commit){
-          var commitLabel = awEscapeHtml(data.commit);
-          if(data.commit_url){
-            var href = awEscapeHtml(data.commit_url);
-            html += '<li>Commit: <a href="' + href +
-              '" target="_blank" rel="noopener">' +
-              commitLabel + '</a></li>';
-          }else{
-            html += '<li>Commit: ' + commitLabel + '</li>';
-          }
-        }
+// Generate diagrams
+document.querySelector("#generateBtn").addEventListener("click", async (e) => {
+  e.preventDefault();
+  const btn = document.querySelector("#generateBtn");
+  const status = document.querySelector("#genStatus");
+  status.textContent = "";
 
-        if(Array.isArray(data.diagram_files)){
-          html += '<li>Diagrams exported: ' +
-            data.diagram_files.length + '</li>';
-        }
+  const briefText = document.querySelector("#briefJson").value.trim();
+  if (!briefText) {
+    status.textContent =
+      "To generate diagrams, first use '1. Requirements Brief' → 'Interpret with AI', then review and save the Generated Brief.";
+    return;
+  }
 
-        if(data.architecture_file){
-          html += '<li>Architecture file: <code>' +
-            awEscapeHtml(data.architecture_file) + '</code></li>';
-        }
+  let parsedBrief;
+  try {
+    parsedBrief = JSON.parse(briefText);
+  } catch (err) {
+    status.textContent =
+      "The Generated Brief is not valid JSON. Fix it or click 'Interpret with AI' again before generating diagrams.";
+    return;
+  }
 
-        html += '</ul>';
+  const form = document.querySelector("#diagramForm");
+  const choices = Array.from(
+    form.querySelectorAll("input[name='choices']:checked")
+  ).map(c => c.value);
 
-        html += '<p class="muted" style="margin-top:8px;">' +
-          'You can continue working here. Open the commit in GitHub to ' +
-          'review the exported docs and diagrams.' +
-          '</p>';
+  if (choices.length === 0) {
+    status.textContent = "Select at least one diagram type before generating.";
+    return;
+  }
 
-        if(statusEl){
-          statusEl.innerHTML = html;
-        }
+  // Require that the brief has been saved at least once to avoid
+  // backend "brief.json not found" errors.
+  if (!hasSavedBrief) {
+    status.textContent =
+      "Please click 'Save Brief' first. This writes brief.json for this project so generation can use it.";
+    return;
+  }
 
-      }catch(err){
-        if(statusEl){
-          statusEl.textContent =
-            'Error calling pipeline endpoint: ' + err.message;
-        }
+  btn.classList.add("btn-busy");
+  status.textContent = "Generating diagrams…";
+
+  try {
+    const r = await fetch("/api/projects/{{ project.slug }}/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ diagrams: choices })
+    });
+
+    const contentType = r.headers.get("content-type") || "";
+    let detail = "";
+
+    if (contentType.includes("application/json")) {
+      const data = await r.json().catch(() => ({}));
+      detail = data.detail || "";
+      if (!r.ok) {
+        throw new Error(
+          `HTTP ${r.status} ${r.statusText || ""}. ${detail}`.trim()
+        );
+      }
+    } else {
+      const text = await r.text().catch(() => "");
+      detail = text ? text.slice(0, 140) + (text.length > 140 ? "…" : "") : "";
+      if (!r.ok) {
+        throw new Error(
+          `Diagram generation failed (HTTP ${r.status} ${r.statusText || ""}). ` +
+          "The server returned a non-JSON response (likely an HTML error page). " +
+          "Check that the backend generation endpoint is reachable."
+        );
       }
     }
-  </script>
+
+    status.textContent = "Generation complete. Use 'View Documentation' to see the results.";
+    showToast("Diagrams generated. Check the docs site.", "success");
+  } catch (err) {
+    console.error(err);
+    status.textContent = "Error during generation: " + err.message;
+    showToast("Generation failed: " + err.message, "error");
+  } finally {
+    btn.classList.remove("btn-busy");
+  }
+});
+</script>
+
 {% endblock %}

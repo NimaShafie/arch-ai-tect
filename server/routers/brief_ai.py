@@ -11,6 +11,8 @@ from pydantic import BaseModel, Field
 # Environment configuration
 AI_API_BASE = os.getenv("AI_API_BASE", "").rstrip("/")
 AI_MODEL = os.getenv("AI_MODEL", "").strip()
+
+# IMPORTANT: this will hold your OpenWebUI JWT token, which we send as a cookie
 AI_API_KEY = os.getenv("AI_API_KEY", "").strip()  # optional
 
 
@@ -35,12 +37,12 @@ def _build_messages(prompt: str) -> List[Dict[str, str]]:
         "DO NOT include Markdown or code fences. "
         "The JSON should have this shape:\n"
         "{\n"
-        '  "project_name": string,\n'
-        '  "summary": string,\n'
-        '  "actors": [ { "name": string, "description": string } ],\n'
-        '  "primary_flows": [ { "name": string, "description": string } ],\n'
-        '  "non_functional": [ string ],\n'
-        '  "tech_preferences": [ string ]\n'
+        '  \"project_name\": string,\n'
+        '  \"summary\": string,\n'
+        '  \"actors\": [ { \"name\": string, \"description\": string } ],\n'
+        '  \"primary_flows\": [ { \"name\": string, \"description\": string } ],\n'
+        '  \"non_functional\": [ string ],\n'
+        '  \"tech_preferences\": [ string ]\n'
         "}\n"
         "If the user is vague, make reasonable assumptions but keep them clearly labeled "
         "in the summary and flows."
@@ -55,6 +57,10 @@ def _build_messages(prompt: str) -> List[Dict[str, str]]:
 async def _call_openwebui(prompt: str) -> Dict[str, Any]:
     """
     Call OpenWebUI's /api/chat/completions endpoint and return the parsed JSON body.
+
+    NOTE: newer OpenWebUI builds often expect the login JWT as a *cookie*
+    (token=<jwt>) instead of an Authorization header, so we mirror what the
+    browser does by sending AI_API_KEY as that cookie.
     """
     if not AI_API_BASE:
         raise HTTPException(
@@ -69,9 +75,12 @@ async def _call_openwebui(prompt: str) -> Dict[str, Any]:
 
     url = f"{AI_API_BASE}/api/chat/completions"
 
-    headers = {"Content-Type": "application/json"}
+    # Always send JSON
+    headers: Dict[str, str] = {"Content-Type": "application/json"}
+
+    # If AI_API_KEY is set, treat it as the JWT and send as a cookie
     if AI_API_KEY:
-        headers["Authorization"] = f"Bearer {AI_API_KEY}"
+        headers["Cookie"] = f"token={AI_API_KEY}"
 
     payload = {
         "model": AI_MODEL,
@@ -115,12 +124,11 @@ def _extract_brief_from_response(data: Dict[str, Any]) -> Dict[str, Any]:
     Extract and normalize the 'brief' from an OpenAI-style chat completion response.
 
     We expect OpenWebUI's /api/chat/completions to return an OpenAI-compatible payload:
-      { "choices": [ { "message": { "content": "..." } } ] }
+      { \"choices\": [ { \"message\": { \"content\": \"...\" } } ] }
 
     The content should be JSON matching our brief schema. If not, we fall back to a
     generic wrapper so the user still sees the raw text and can edit it.
     """
-    # Try standard OpenAI-style shape
     content: Optional[str] = None
     try:
         content = data["choices"][0]["message"]["content"]
@@ -181,10 +189,6 @@ async def interpret_brief(slug: str, body: BriefInterpretIn) -> BriefOut:
     The slug is currently just passed through for logging/consistency; the brief itself
     is derived entirely from the prompt text.
     """
-    # Call AI backend
     data = await _call_openwebui(body.prompt)
-
-    # Normalize into our brief shape
     brief = _extract_brief_from_response(data)
-
     return BriefOut(brief=brief)

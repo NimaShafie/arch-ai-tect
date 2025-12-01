@@ -8,6 +8,7 @@ Use this page as the hub to jump into each project's package docs and diagrams.
 
 - [Disney+AI+V3](/projects/disney-ai-v3/)
 - [test-2](/projects/test-2/)
+- [foo-fest](/projects/foo-fest/)
 
 ---
 
@@ -35,4 +36,18 @@ Use this page as the hub to jump into each project's package docs and diagrams.
 | ------------ | ----- |
 | Package docs | [Spec](/projects/test-2/package/spec.md) · [SRS](/projects/test-2/package/srs.md) · [Ref Arch](/projects/test-2/package/reference-arch.md) · [Impl Guide](/projects/test-2/package/implementation-guide.md) |
 | Diagrams     | [C4 Context](/projects/test-2/diagrams/c4_context.md) · [C4 Container](/projects/test-2/diagrams/c4_container.md) · [C4 Component](/projects/test-2/diagrams/c4_component.md) · [Logical](/projects/test-2/diagrams/logical.md) · [Deployment](/projects/test-2/diagrams/deployment.md) · [Sequence](/projects/test-2/diagrams/sequence.md) |
+
+
+---
+
+## [foo-fest](/projects/foo-fest/)
+
+**Created:** 2025-12-01  
+**Slug:** `foo-fest`  
+**Summary:** Architecture workspace managed by the ArchAiTect Workbench.
+
+| Category     | Links |
+| ------------ | ----- |
+| Package docs | [Spec](/projects/foo-fest/package/spec.md) · [SRS](/projects/foo-fest/package/srs.md) · [Ref Arch](/projects/foo-fest/package/reference-arch.md) · [Impl Guide](/projects/foo-fest/package/implementation-guide.md) |
+| Diagrams     | [C4 Context](/projects/foo-fest/diagrams/c4_context.md) · [C4 Container](/projects/foo-fest/diagrams/c4_container.md) · [C4 Component](/projects/foo-fest/diagrams/c4_component.md) · [Logical](/projects/foo-fest/diagrams/logical.md) · [Deployment](/projects/foo-fest/diagrams/deployment.md) · [Sequence](/projects/foo-fest/diagrams/sequence.md) |
 
