@@ -46,6 +46,150 @@ def _brief_path(slug: str) -> Path:
     return DOCS_ROOT / slug / "brief.json"
 
 
+def _trigger_docs_refresh_local() -> None:
+    """
+    Trigger docs refresh using the same pattern as ui.py.
+    This runs run_build_nav.py and restarts the docs container.
+    """
+    import subprocess
+    import sys
+    from pathlib import Path
+    
+    # FIXED: server/routers/brief.py -> go up 2 levels to reach arch-workbench/
+    # server/routers/ -> server/ -> arch-workbench/
+    REPO_ROOT = Path(__file__).resolve().parents[2]
+    
+    # Step 1: rebuild nav + combined project index pages
+    try:
+        subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "server.services.run_build_nav",
+            ],
+            cwd=str(REPO_ROOT),
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        print("[brief.py] Successfully ran run_build_nav")
+    except subprocess.CalledProcessError as e:
+        print(f"[brief.py] WARNING: run_build_nav failed: {e}")
+        print(f"[brief.py] STDOUT: {e.stdout.decode() if e.stdout else 'none'}")
+        print(f"[brief.py] STDERR: {e.stderr.decode() if e.stderr else 'none'}")
+    except Exception as e:
+        print(f"[brief.py] WARNING: run_build_nav failed: {e}")
+    
+    # Step 2: restart docs container
+    try:
+        subprocess.run(
+            [
+                "docker",
+                "compose",
+                "-f",
+                "compose/docker-compose.yml",
+                "restart",
+                "docs",
+            ],
+            cwd=str(REPO_ROOT),
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        print("[brief.py] Successfully restarted docs container")
+    except subprocess.CalledProcessError as e:
+        print(f"[brief.py] WARNING: docker restart docs failed: {e}")
+        print(f"[brief.py] STDOUT: {e.stdout.decode() if e.stdout else 'none'}")
+        print(f"[brief.py] STDERR: {e.stderr.decode() if e.stderr else 'none'}")
+    except Exception as e:
+        print(f"[brief.py] WARNING: docker restart docs failed: {e}")
+
+
+def _create_package_scaffolds(slug: str, brief_data: Dict[str, Any]) -> None:
+    """
+    Create scaffold markdown files in docs/projects/<slug>/package/ based on brief.json.
+    
+    This generates the initial Package section content that appears on the MkDocs
+    project page, even before diagrams are generated.
+    """
+    package_dir = DOCS_ROOT / slug / "package"
+    package_dir.mkdir(parents=True, exist_ok=True)
+    
+    project_name = brief_data.get("project_name", slug.replace("-", " ").title())
+    summary = brief_data.get("summary", "No summary provided.")
+    
+    # Extract actors if present
+    actors = brief_data.get("actors", [])
+    actors_section = ""
+    if actors:
+        actors_section = "\n".join(
+            f"* {actor.get('name', 'Unknown')} ({actor.get('role', 'role not specified')}) — "
+            f"{actor.get('description', 'No description provided.')}"
+            for actor in actors
+        )
+    else:
+        actors_section = "* User () — An individual who interacts with the system."
+    
+    # spec.md - Architecture Spec
+    spec_content = f"""# {project_name} – Architecture Specification
+
+## Summary
+
+{summary}
+"""
+    (package_dir / "spec.md").write_text(spec_content.strip() + "\n", encoding="utf-8")
+    
+    # reference-arch.md - Reference Architecture  
+    ref_arch_content = f"""# Reference Architecture
+
+## Context
+
+This section summarizes the high-level context and major actors as understood from the requirements brief.
+
+## Actors
+
+{actors_section}
+
+## Key Scenarios
+
+See generated sequence diagrams and the SRS for detailed flows.
+"""
+    (package_dir / "reference-arch.md").write_text(ref_arch_content.strip() + "\n", encoding="utf-8")
+    
+    # implementation-guide.md - Implementation Guide
+    impl_content = f"""# Implementation Guide
+
+## Overview
+
+This guide outlines a suggested implementation path based on the requirements brief and generated architecture views.
+
+## Next Steps
+
+* Refine containers and components based on the C4 diagrams.
+* Align implementation tasks with user journeys and requirements.
+* Feed these artifacts into the downstream developer AI.
+"""
+    (package_dir / "implementation-guide.md").write_text(impl_content.strip() + "\n", encoding="utf-8")
+    
+    # srs.md - Software Requirements Specification
+    srs_content = f"""# Software Requirements Specification (SRS)
+
+## Functional Requirements
+
+See the Architecture Spec and generated diagrams for detailed functional requirements.
+
+## Non-Functional Requirements
+
+* Performance: The system should respond to user requests within acceptable time limits.
+* Security: All user data must be protected and authenticated properly.
+* Scalability: The architecture should support growth in users and data.
+"""
+    (package_dir / "srs.md").write_text(srs_content.strip() + "\n", encoding="utf-8")
+    
+    print(f"[brief.py] Created package scaffold files for project '{slug}'")
+
+
+
 @router.get("/{slug}/brief")
 def get_brief(
     slug: str,
@@ -112,5 +256,13 @@ def save_brief(
             status_code=500,
             detail=f"Failed to save brief for project '{slug}': {exc}",
         ) from exc
+
+    # Create scaffold package files so the Package section is populated
+    _create_package_scaffolds(slug, payload.brief)
+
+    # CRITICAL FIX: Trigger docs refresh so MkDocs picks up the changes
+    # This mirrors the pattern used in ui.py for create/delete operations
+    print(f"[brief.py] Triggering docs refresh for project '{slug}'")
+    _trigger_docs_refresh_local()
 
     return {"status": "ok"}

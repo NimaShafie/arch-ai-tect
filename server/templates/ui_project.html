@@ -1,10 +1,8 @@
 <!-- server/templates/ui_project.html -->
 {% extends "base.html" %}
 {% block title %}{{ project.name }} · Workbench{% endblock %}
-
 {% block content %}
 <div class="shell" style="padding-bottom:60px;">
-
   <!-- Lightweight spinner + toast styles (no layout changes) -->
   <style>
     .btn-busy {
@@ -28,7 +26,6 @@
     @keyframes ui-spin {
       to { transform: rotate(360deg); }
     }
-
     #toastRoot {
       position: fixed;
       top: 16px;
@@ -52,15 +49,12 @@
     .toast-success { background: #065f46; }
     .toast-error { background: #991b1b; }
   </style>
-
   <!-- Toast container -->
   <div id="toastRoot"></div>
-
   <!-- Header -->
   <div style="margin-bottom:20px;">
     <h1 class="h1" style="margin-bottom:4px;">{{ project.name }}</h1>
     <p class="muted" style="margin-bottom:16px;">Project workspace for {{ project.slug }}</p>
-
     <!-- Docs pill nav → hard-pointed to MkDocs host -->
     <div style="display:flex; flex-wrap:wrap; gap:8px;">
       <a href="https://docs.shafie.org/projects/{{ project.slug }}/"
@@ -77,7 +71,6 @@
          target="_blank" class="btn pill">Diagrams</a>
     </div>
   </div>
-
   <!-- Mini tutorial / workflow helper -->
   <section class="card" style="margin-bottom:20px;">
     <div style="padding:18px 22px;">
@@ -101,20 +94,16 @@
       </ol>
     </div>
   </section>
-
   <!-- Two-column layout: left = brief, right = generate + view -->
   <div style="display:flex; gap:24px; align-items:stretch;">
-
     <!-- LEFT: REQUIREMENTS BRIEF -->
     <section class="card" style="flex:1.35;">
       <div style="padding:24px 28px; height:100%; box-sizing:border-box;">
         <h2 class="h1" style="margin-bottom:10px;">1. Requirements Brief</h2>
-
         <p class="muted" style="margin-bottom:16px;">
           Describe your system, key users, major flows, constraints, expectations, and tech preferences.
           The AI will interpret this and generate a structured brief for the rest of the toolchain.
         </p>
-
         <label class="muted" for="briefPrompt" style="display:block; margin-bottom:6px;">
           Describe your system
         </label>
@@ -124,7 +113,6 @@
           placeholder="For example: a streaming platform where users can sign in, manage profiles, browse a catalog, and start video playback..."
           style="min-height:140px; padding:10px 12px; resize:vertical;"
         ></textarea>
-
         <div style="margin-top:14px;">
           <button
             id="interpretBtn"
@@ -134,9 +122,7 @@
             Interpret with AI
           </button>
         </div>
-
         <p id="interpretStatus" class="muted" style="margin-top:10px; min-height:18px;"></p>
-
         <h3 style="margin-top:22px; margin-bottom:8px; font-size:1rem; font-weight:600;">
           Generated Brief (edit if needed)
         </h3>
@@ -145,7 +131,6 @@
           class="input"
           style="min-height:260px; font-family:monospace; padding:10px 12px; resize:vertical;"
         ></textarea>
-
         <div style="margin-top:14px;">
           <button
             id="saveBriefBtn"
@@ -157,10 +142,8 @@
         </div>
       </div>
     </section>
-
     <!-- RIGHT COLUMN: GENERATE + VIEW OUTPUT -->
     <div style="flex:1; display:flex; flex-direction:column; gap:24px; height:100%;">
-
       <!-- Generate Architecture (tile style like previous Diagram Choices) -->
       <section class="card" id="choices" style="flex:1;">
         <div class="bd" style="padding:24px 28px; height:100%; box-sizing:border-box; display:flex; flex-direction:column;">
@@ -168,7 +151,6 @@
           <p class="muted" style="margin-bottom:16px;">
             Select which architectural diagrams to generate based on the Requirements Brief.
           </p>
-
           <style>
             #choices .fields {
               display: grid;
@@ -219,7 +201,6 @@
               text-overflow: ellipsis;
             }
           </style>
-
           <form id="diagramForm" style="display:flex; flex-direction:column; flex:1;">
             <div class="fields">
               <div class="tile">
@@ -228,35 +209,30 @@
                   <span class="label-text">C4 Context</span>
                 </label>
               </div>
-
               <div class="tile">
                 <label class="tile-hit">
                   <input type="checkbox" name="choices" value="c4_container" />
                   <span class="label-text">C4 Container</span>
                 </label>
               </div>
-
               <div class="tile">
                 <label class="tile-hit">
                   <input type="checkbox" name="choices" value="c4_component" />
                   <span class="label-text">C4 Component</span>
                 </label>
               </div>
-
               <div class="tile">
                 <label class="tile-hit">
                   <input type="checkbox" name="choices" value="sequence" />
                   <span class="label-text">Sequence</span>
                 </label>
               </div>
-
               <div class="tile">
                 <label class="tile-hit">
                   <input type="checkbox" name="choices" value="deployment" />
                   <span class="label-text">Deployment</span>
                 </label>
               </div>
-
               <div class="tile">
                 <label class="tile-hit">
                   <input type="checkbox" name="choices" value="logical" />
@@ -264,7 +240,6 @@
                 </label>
               </div>
             </div>
-
             <div style="margin-top:12px;">
               <button
                 class="btn primary"
@@ -274,12 +249,10 @@
                 Generate Diagrams
               </button>
             </div>
-
             <p id="genStatus" class="muted" style="margin-top:10px; min-height:18px;"></p>
           </form>
         </div>
       </section>
-
       <!-- View Output (directly under Generate Architecture) -->
       <section class="card">
         <div style="padding:24px 28px;">
@@ -287,7 +260,6 @@
           <p class="muted" style="margin-bottom:14px;">
             Browse generated documentation and diagrams rendered via MkDocs and PlantUML/Kroki.
           </p>
-
           <a
             href="https://docs.shafie.org/projects/{{ project.slug }}/"
             target="_blank"
@@ -298,13 +270,9 @@
           </a>
         </div>
       </section>
-
     </div>
-
   </div>
-
 </div>
-
 <script>
 // Toast helper
 const toastRoot = document.querySelector("#toastRoot");
@@ -326,10 +294,8 @@ function showToast(message, type) {
   }, 3000);
   setTimeout(() => el.remove(), 3400);
 }
-
 // track whether we've successfully saved at least once
 let hasSavedBrief = false;
-
 // Load existing brief.json into the editor on page load
 (async () => {
   try {
@@ -345,28 +311,23 @@ let hasSavedBrief = false;
     console.error("Failed to load brief:", err);
   }
 })();
-
 // Interpret Requirements with AI
 document.querySelector("#interpretBtn").addEventListener("click", async () => {
   const btn = document.querySelector("#interpretBtn");
   const prompt = document.querySelector("#briefPrompt").value.trim();
   const status = document.querySelector("#interpretStatus");
-
   if (!prompt) {
     status.textContent = "Enter a prompt first.";
     return;
   }
-
   status.textContent = "Interpreting with AI…";
   btn.classList.add("btn-busy");
-
   try {
     const r = await fetch("/api/projects/{{ project.slug }}/brief/interpret", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt })
     });
-
     const contentType = r.headers.get("content-type") || "";
     let detail = "";
     if (contentType.includes("application/json")) {
@@ -380,7 +341,6 @@ document.querySelector("#interpretBtn").addEventListener("click", async () => {
       const text = await r.text().catch(() => "");
       detail = text ? text.slice(0, 140) + (text.length > 140 ? "…" : "") : "";
     }
-
     if (!r.ok) {
       let hint = "";
       if (r.status >= 500) {
@@ -390,7 +350,6 @@ document.querySelector("#interpretBtn").addEventListener("click", async () => {
         `HTTP ${r.status}. ${detail || ""}${hint}`.trim()
       );
     }
-
     status.textContent = "AI interpretation complete.";
   } catch (err) {
     console.error(err);
@@ -399,18 +358,15 @@ document.querySelector("#interpretBtn").addEventListener("click", async () => {
     btn.classList.remove("btn-busy");
   }
 });
-
-// Save brief.json (with toast instead of alert)
+// Save brief.json (with button text change)
 document.querySelector("#saveBriefBtn").addEventListener("click", async () => {
   const btn = document.querySelector("#saveBriefBtn");
   const text = document.querySelector("#briefJson").value;
   const trimmed = text.trim();
-
   if (!trimmed) {
     showToast("Nothing to save yet. Use 'Interpret with AI' first or paste a brief JSON.", "error");
     return;
   }
-
   let parsed;
   try {
     parsed = JSON.parse(trimmed);
@@ -419,16 +375,18 @@ document.querySelector("#saveBriefBtn").addEventListener("click", async () => {
     console.error(e);
     return;
   }
-
+  
+  // Store original text and change button text
+  const originalText = btn.textContent;
+  btn.textContent = "Saving...";
   btn.classList.add("btn-busy");
-
+  
   try {
     const r = await fetch("/api/projects/{{ project.slug }}/brief", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ brief: parsed })
     });
-
     if (!r.ok) throw new Error(`Failed to save brief (HTTP ${r.status}).`);
     hasSavedBrief = true;
     showToast("Brief saved.", "success");
@@ -437,23 +395,21 @@ document.querySelector("#saveBriefBtn").addEventListener("click", async () => {
     showToast("Save failed: " + err.message, "error");
   } finally {
     btn.classList.remove("btn-busy");
+    btn.textContent = originalText;
   }
 });
-
-// Generate diagrams
+// Generate diagrams (with button text change)
 document.querySelector("#generateBtn").addEventListener("click", async (e) => {
   e.preventDefault();
   const btn = document.querySelector("#generateBtn");
   const status = document.querySelector("#genStatus");
   status.textContent = "";
-
   const briefText = document.querySelector("#briefJson").value.trim();
   if (!briefText) {
     status.textContent =
       "To generate diagrams, first use '1. Requirements Brief' → 'Interpret with AI', then review and save the Generated Brief.";
     return;
   }
-
   let parsedBrief;
   try {
     parsedBrief = JSON.parse(briefText);
@@ -462,17 +418,14 @@ document.querySelector("#generateBtn").addEventListener("click", async (e) => {
       "The Generated Brief is not valid JSON. Fix it or click 'Interpret with AI' again before generating diagrams.";
     return;
   }
-
   const form = document.querySelector("#diagramForm");
   const choices = Array.from(
     form.querySelectorAll("input[name='choices']:checked")
   ).map(c => c.value);
-
   if (choices.length === 0) {
     status.textContent = "Select at least one diagram type before generating.";
     return;
   }
-
   // Require that the brief has been saved at least once to avoid
   // backend "brief.json not found" errors.
   if (!hasSavedBrief) {
@@ -480,20 +433,21 @@ document.querySelector("#generateBtn").addEventListener("click", async (e) => {
       "Please click 'Save Brief' first. This writes brief.json for this project so generation can use it.";
     return;
   }
-
+  
+  // Store original text and change button text
+  const originalText = btn.textContent;
+  btn.textContent = "Generating...";
   btn.classList.add("btn-busy");
   status.textContent = "Generating diagrams…";
-
+  
   try {
     const r = await fetch("/api/projects/{{ project.slug }}/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ diagrams: choices })
     });
-
     const contentType = r.headers.get("content-type") || "";
     let detail = "";
-
     if (contentType.includes("application/json")) {
       const data = await r.json().catch(() => ({}));
       detail = data.detail || "";
@@ -513,7 +467,6 @@ document.querySelector("#generateBtn").addEventListener("click", async (e) => {
         );
       }
     }
-
     status.textContent = "Generation complete. Use 'View Documentation' to see the results.";
     showToast("Diagrams generated. Check the docs site.", "success");
   } catch (err) {
@@ -522,8 +475,8 @@ document.querySelector("#generateBtn").addEventListener("click", async (e) => {
     showToast("Generation failed: " + err.message, "error");
   } finally {
     btn.classList.remove("btn-busy");
+    btn.textContent = originalText;
   }
 });
 </script>
-
 {% endblock %}

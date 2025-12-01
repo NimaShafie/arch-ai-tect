@@ -5,6 +5,9 @@ projects:
 - slug: test-2
   title: test-2
   url: /projects/test-2/
-- slug: test-4
-  title: test-4
-  url: /projects/test-4/
+- slug: test-7
+  title: test-7
+  url: /projects/test-7/
+- slug: test-6
+  title: test-6
+  url: /projects/test-6/

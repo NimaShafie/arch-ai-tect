@@ -118,6 +118,65 @@ def _ensure_diagram_pages(slug: str, ids: List[str]) -> None:
         _write_text(md_path, content)
 
 
+def _trigger_docs_refresh_local() -> None:
+    """
+    Trigger docs refresh using the same pattern as ui.py.
+    This runs run_build_nav.py and restarts the docs container.
+    """
+    import subprocess
+    import sys
+    from pathlib import Path
+    
+    # FIXED: server/routers/generate.py -> go up 2 levels to reach arch-workbench/
+    # server/routers/ -> server/ -> arch-workbench/
+    REPO_ROOT = Path(__file__).resolve().parents[2]
+    
+    # Step 1: rebuild nav + combined project index pages
+    try:
+        subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "server.services.run_build_nav",
+            ],
+            cwd=str(REPO_ROOT),
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        print("[generate.py] Successfully ran run_build_nav")
+    except subprocess.CalledProcessError as e:
+        print(f"[generate.py] WARNING: run_build_nav failed: {e}")
+        print(f"[generate.py] STDOUT: {e.stdout.decode() if e.stdout else 'none'}")
+        print(f"[generate.py] STDERR: {e.stderr.decode() if e.stderr else 'none'}")
+    except Exception as e:
+        print(f"[generate.py] WARNING: run_build_nav failed: {e}")
+    
+    # Step 2: restart docs container
+    try:
+        subprocess.run(
+            [
+                "docker",
+                "compose",
+                "-f",
+                "compose/docker-compose.yml",
+                "restart",
+                "docs",
+            ],
+            cwd=str(REPO_ROOT),
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        print("[generate.py] Successfully restarted docs container")
+    except subprocess.CalledProcessError as e:
+        print(f"[generate.py] WARNING: docker restart docs failed: {e}")
+        print(f"[generate.py] STDOUT: {e.stdout.decode() if e.stdout else 'none'}")
+        print(f"[generate.py] STDERR: {e.stderr.decode() if e.stderr else 'none'}")
+    except Exception as e:
+        print(f"[generate.py] WARNING: docker restart docs failed: {e}")
+
+
 @router.post("/api/projects/{slug}/generate", response_model=GenerateResponse)
 async def generate_project(slug: str, body: GenerateRequest) -> GenerateResponse:
     """
@@ -150,6 +209,11 @@ async def generate_project(slug: str, body: GenerateRequest) -> GenerateResponse
             status_code=500,
             detail=f"Generation failed: {exc}",
         ) from exc
+
+    # CRITICAL FIX: Trigger docs refresh so MkDocs picks up the changes
+    # This mirrors the pattern used in ui.py for create/delete operations
+    print(f"[generate.py] Triggering docs refresh for project '{slug}'")
+    _trigger_docs_refresh_local()
 
     return GenerateResponse(status="ok", diagrams=body.diagrams)
 
