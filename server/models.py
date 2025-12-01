@@ -9,8 +9,8 @@ class User(SQLModel, table=True):
     email: str = Field(index=True, unique=True)
     password_hash: str
     display_name: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
     projects: List["Project"] = Relationship(back_populates="owner")
 
 
@@ -20,8 +20,8 @@ class Project(SQLModel, table=True):
     name: str
     nav_title: str
     user_id: Optional[int] = Field(default=None, foreign_key="user.id")  # None => legacy/unassigned
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
 
     owner: Optional[User] = Relationship(back_populates="projects")
     artifacts: List["Artifact"] = Relationship(back_populates="project")
