@@ -2,6 +2,7 @@ site_name: ArchAiTect Workbench
 site_url: https://docs.shafie.org
 theme:
   name: material
+  favicon: assets/favicon.svg
   features:
   - content.code.copy
   - content.tabs.link

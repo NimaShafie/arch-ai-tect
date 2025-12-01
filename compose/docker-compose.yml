@@ -81,13 +81,14 @@ services:
       - sh
       - -lc
       - >
-        python3 server/services/run_build_nav.py &&
+        python3 -m server.services.run_build_nav &&
         mkdocs serve -a 0.0.0.0:8080 --no-strict --dirtyreload
-        --watch /work/docs
-        --watch /work/mkdocs.yml
-        --watch /work/server/services
+        --watch docs
+        --watch mkdocs.yml
+        --watch server/services
     environment:
       - XDG_CACHE_HOME=/var/mkdocs/cache
+      # PYTHONPATH is also set in the Dockerfile, but keeping this is harmless
       - PYTHONPATH=/work
     volumes:
       - ../:/work:rw
@@ -104,7 +105,7 @@ services:
     image: plantuml/plantuml-server:jetty
     container_name: plantuml
     restart: unless-stopped
-    # CHANGED: expose PlantUML on host 8080 so PIPELINE_PLANTUML_BASE=http://127.0.0.1:8080 works
+    # Expose PlantUML on host 8080 so PIPELINE_PLANTUML_BASE=http://127.0.0.1:8080 works
     ports:
       - "8080:8080"
     networks: [proxy]

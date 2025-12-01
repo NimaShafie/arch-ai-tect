@@ -34,5 +34,6 @@ RUN pip install --no-cache-dir \
       mkdocs-monorepo-plugin \
       mkdocs-awesome-pages-plugin
 
-# MkDocs cache
+# MkDocs + Python cache locations
 ENV XDG_CACHE_HOME=/var/mkdocs/cache
+ENV PYTHONPATH=/work
