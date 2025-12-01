@@ -5,194 +5,193 @@
 {% block content %}
 
 <style>
-  /* Page background already set in base; extra safeguard */
-  body {
-    background: radial-gradient(circle at top left, #f4f7ff 0, #f5f7fb 38%, #eef3ff 100%);
+  /* Lightweight button busy state (shared by Create/Delete) */
+  .btn-busy {
+    position: relative;
+    pointer-events: none;
+    opacity: 0.8;
+    padding-right: 30px !important;
+  }
+  .btn-busy::after {
+    content: "";
+    position: absolute;
+    right: 10px;
+    width: 14px;
+    height: 14px;
+    border-radius: 999px;
+    border: 2px solid rgba(255,255,255,0.45);
+    border-top-color: #ffffff;
+    animation: ui-spin 0.6s linear infinite;
+  }
+  @keyframes ui-spin {
+    to { transform: rotate(360deg); }
   }
 
-  .home-shell {
-    padding-bottom: 64px;
-  }
-
-  .pill-soft {
+  /* Tiny pill used in the “Docs & diagrams auto-wired to MkDocs” badge */
+  .pill-badge {
     display:inline-flex;
     align-items:center;
-    gap:6px;
-    padding:4px 10px;
+    gap:14px;
+    padding:10px 14px;
     border-radius:999px;
+    background:rgba(59,130,246,.08);
+    border:1px solid rgba(59,130,246,.18);
     font-size:12px;
-    background:rgba(59,130,246,0.06);
-    color:#2563eb;
+    color:#1d4ed8;
   }
-  .pill-soft-dot {
+  .pill-badge-dot {
     width:8px;
     height:8px;
     border-radius:999px;
-    background:#22c55e;
-    box-shadow:0 0 0 4px rgba(34,197,94,0.25);
+    background:#4ade80;
+    box-shadow:0 0 0 4px rgba(74,222,128,.45);
   }
 
-  .mini-cols {
-    display:flex;
-    flex-wrap:wrap;
-    gap:18px;
+  /* Small “timeline” list under the pipeline tiles */
+  .pipeline-steps {
     margin-top:18px;
-  }
-  .mini-col-label {
-    font-size:11px;
-    letter-spacing:0.08em;
-    text-transform:uppercase;
-    color:rgba(15,23,42,0.55);
-    margin-bottom:6px;
-  }
-  .mini-col-title {
-    font-size:14px;
-    font-weight:600;
-    color:#0f172a;
-  }
-
-  /* Busy state for buttons */
-  .btn-busy {
-    position:relative;
-    pointer-events:none;
-    opacity:0.8;
-  }
-  .btn-busy::after {
-    content:"";
-    position:absolute;
-    right:12px;
-    width:13px;
-    height:13px;
-    border-radius:999px;
-    border:2px solid rgba(255,255,255,0.55);
-    border-top-color:#ffffff;
-    animation: aw-spin 0.6s linear infinite;
-  }
-  @keyframes aw-spin { to { transform:rotate(360deg); } }
-
-  /* Projects table layout */
-  .projects-table {
-    width:100%;
-    margin-top:12px;
-  }
-  .projects-header,
-  .projects-row {
-    display:grid;
-    grid-template-columns: 2.3fr 2.1fr 1.6fr 1.3fr;
-    gap:16px;
-    align-items:center;
-  }
-  .projects-header {
-    font-size:12px;
-    text-transform:uppercase;
-    letter-spacing:0.09em;
-    color:rgba(15,23,42,0.55);
-    padding:6px 0 10px;
-  }
-  .projects-row {
-    padding:14px 0;
-    border-top:1px solid var(--border);
-  }
-  .projects-actions {
-    display:flex;
-    justify-content:center;
-    gap:10px;
-  }
-  .projects-created {
-    text-align:right;
-    min-width:120px;
-  }
-
-  #createStatus {
-    margin-top:8px;
-    min-height:18px;
+    padding:14px 16px;
+    background:rgba(15,23,42,0.02);
+    border-radius:14px;
+    border:1px dashed rgba(148,163,184,.55);
     font-size:13px;
-    color:rgba(15,23,42,0.65);
+  }
+  .pipeline-steps strong {
+    font-weight:600;
+  }
+  .pipeline-steps ol {
+    margin:6px 0 0;
+    padding-left:18px;
+  }
+  .pipeline-steps li {
+    margin-bottom:4px;
   }
 </style>
 
-<div class="home-shell">
+<div class="shell" style="padding-bottom:60px;">
 
-  <!-- HERO / SUMMARY CARD -->
-  <section class="card" style="display:flex; justify-content:space-between; gap:24px; align-items:stretch;">
-    <div style="flex:1.1; padding:24px 28px;">
-      <h1 class="h1" style="margin-bottom:6px;">ArchAiTect Workbench</h1>
-      <p class="muted" style="max-width:540px; margin-bottom:18px;">
-        Design systems once. Generate living architecture docs, diagrams, and
-        specs — and keep everything in sync with your code.
-      </p>
-      <a href="https://docs.shafie.org" class="btn">
-        View docs site
-      </a>
-    </div>
+  <!-- HERO / HEADER CARD -->
+  <section class="card" style="margin-bottom:22px;">
+    <div style="display:flex; justify-content:space-between; gap:32px; align-items:stretch; padding:26px 32px;">
+      <div style="flex:1.4; min-width:0;">
+        <h1 class="h1" style="margin-bottom:8px;">ArchAiTect Workbench</h1>
+        <p class="muted" style="max-width:520px; line-height:1.5;">
+          Design systems once. Generate living architecture docs, diagrams, and specs —
+          and keep everything in sync with your code.
+        </p>
 
-    <aside class="card" style="
-        flex:0 0 280px;
-        margin:16px 18px;
-        background:radial-gradient(circle at top left,#eef2ff 0,#f5f3ff 45%,#fdf2ff 100%);
-        border:none;
-        box-shadow:0 18px 45px rgba(129,140,248,0.25);
-    ">
-      <div class="bd" style="padding:18px 20px;">
-        <div style="font-size:11px; letter-spacing:0.16em; text-transform:uppercase; color:#6366f1; margin-bottom:12px;">
+        <div style="margin-top:18px;">
+          <a href="https://docs.shafie.org" target="_blank" class="btn">
+            View docs site
+          </a>
+        </div>
+      </div>
+
+      <!-- At a glance stats -->
+      <aside style="
+        flex:0 0 350px;
+        align-self:stretch;
+        border-radius:24px;
+        padding:12px 20px;
+        background:
+          radial-gradient(circle at 10% 0%, rgba(59,130,246,0.12), transparent 55%),
+          radial-gradient(circle at 100% 100%, rgba(236,72,153,0.13), transparent 60%),
+          rgba(248,250,252,0.9);
+        box-shadow:0 18px 45px rgba(15,23,42,0.08);
+      ">
+        <div style="font-size:11px; text-transform:uppercase; letter-spacing:.16em; color:rgba(15,23,42,.55); margin-bottom:10px;">
           At a glance
         </div>
-
-        <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.12em; color:#9ca3af;">
-          Active projects
+        <div style="display:flex; flex-direction:column; gap:10px; font-size:13px;">
+          <div>
+            <div style="opacity:.55; text-transform:uppercase; letter-spacing:.14em; font-size:11px;">Active projects</div>
+            <div style="font-size:18px; font-weight:600;">
+              {{ projects|length }}
+            </div>
+          </div>
+          <div>
+            <div style="opacity:.55; text-transform:uppercase; letter-spacing:.14em; font-size:11px;">Core docs</div>
+            <div style="font-size:18px; font-weight:600;">16</div>
+          </div>
+          <div>
+            <div style="opacity:.55; text-transform:uppercase; letter-spacing:.14em; font-size:11px;">Generated diagrams</div>
+            <div style="font-size:18px; font-weight:600;">24+</div>
+          </div>
         </div>
-        <div style="font-size:22px; font-weight:700; margin:2px 0 12px;">{{ projects|length }}</div>
-
-        <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.12em; color:#9ca3af;">
-          Core docs
-        </div>
-        <div style="font-size:16px; font-weight:600; margin:2px 0 12px;">16</div>
-
-        <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.12em; color:#9ca3af;">
-          Generated diagrams
-        </div>
-        <div style="font-size:16px; font-weight:600; margin-top:2px;">24+</div>
-      </div>
-    </aside>
+      </aside>
+    </div>
   </section>
 
-  <!-- NEW PROJECT CARD -->
-  <section class="card" style="margin-top:22px;">
-    <div class="bd" style="padding:24px 32px;">
-      <div style="display:flex; gap:40px; align-items:flex-start; justify-content:space-between;">
-        <!-- LEFT: pipeline explanation / flair -->
-        <div style="flex:1.1; min-width:260px;">
-          <div class="pill-soft">
-            <span class="pill-soft-dot"></span>
+  <!-- PIPELINE + NEW PROJECT CARD -->
+  <section class="card" style="margin-bottom:24px;">
+    <div style="padding:30px 65px 30px 30px;">
+      <div style="
+        display:grid;
+        grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.05fr);
+        gap:26px;  /* slightly smaller gap so the right side shifts left a bit */
+        align-items:flex-start;
+      ">
+
+        <!-- LEFT: pipeline explainer + filler content -->
+        <div>
+          <div class="pill-badge">
+            <span class="pill-badge-dot"></span>
             <span>Docs &amp; diagrams auto-wired to MkDocs</span>
           </div>
 
-          <div class="mini-cols">
+          <div style="display:flex; gap:40px; margin-top:40px; font-size:13px; text-transform:uppercase; letter-spacing:.14em; color:rgba(15,23,42,.55);">
             <div>
-              <div class="mini-col-label">Pipeline</div>
-              <div class="mini-col-title">GitHub + MkDocs</div>
+              <div style="margin-bottom:4px;">Pipeline</div>
+              <div style="font-size:15px; font-weight:600; text-transform:none; letter-spacing:0; color:#020617;">
+                GitHub + MkDocs
+              </div>
             </div>
             <div>
-              <div class="mini-col-label">AI Assist</div>
-              <div class="mini-col-title">Requirements → C4</div>
+              <div style="margin-bottom:4px;">AI Assist</div>
+              <div style="font-size:15px; font-weight:600; text-transform:none; letter-spacing:0; color:#020617;">
+                Requirements → C4
+              </div>
             </div>
             <div>
-              <div class="mini-col-label">Sync</div>
-              <div class="mini-col-title">Brief → Diagrams</div>
+              <div style="margin-bottom:4px;">Sync</div>
+              <div style="font-size:15px; font-weight:600; text-transform:none; letter-spacing:0; color:#020617;">
+                Brief → Diagrams
+              </div>
             </div>
+          </div>
+
+          <!-- NEW: gap-filler “when you click create” timeline -->
+          <div class="pipeline-steps">
+            <div style="font-size:11px; text-transform:uppercase; letter-spacing:.16em; color:rgba(15,23,42,.6);">
+              When you click “Create”
+            </div>
+            <ol>
+              <li>
+                <strong>Scaffold</strong> — New project folder &amp; nav entries are created under
+                <code style="font-size:11px;">docs/projects/</code>.<p>
+              </li>
+              <li>
+                <strong>Wire up docs</strong> — Spec, SRS, reference architecture, and diagram
+                stubs are wired into MkDocs.<p>
+              </li>
+              <li>
+                <strong>Refresh site</strong> — MkDocs performs a quick rebuild. This can take a few
+                seconds to show up in <em>Docs</em>.<p>
+              </li>
+            </ol>
           </div>
         </div>
 
-        <!-- RIGHT: heading + form stacked -->
-        <div style="flex:1.3; min-width:320px; max-width:520px;">
-          <h2 class="h1" style="margin-bottom:4px;">New Architecture Project</h2>
-          <p class="muted" style="margin-bottom:18px;">
+        <!-- RIGHT: new project form (shifted slightly left by grid gap change) -->
+        <div style="border-left:1px solid rgba(148,163,184,.35); padding-left:28px; min-width:0;">
+          <h2 class="h1" style="margin-bottom:8px;">New Architecture Project</h2>
+          <p class="muted" style="margin-bottom:18px; max-width:360px;">
             Create a project namespace; we’ll scaffold its docs and keep artifacts in sync.
           </p>
 
           <form id="createForm" autocomplete="off">
-            <div class="form-row">
-              <label for="name">Project Name</label>
+            <div class="form-row" style="margin-bottom:12px;">
+              <label for="name" style="display:block; margin-bottom:4px;">Project Name</label>
               <input
                 id="name"
                 name="name"
@@ -203,63 +202,93 @@
               />
             </div>
 
-            <div style="margin-top:12px;">
-              <button type="submit" class="btn primary" id="createBtn">Create</button>
-            </div>
-            <p id="createStatus"></p>
+            <button
+              type="submit"
+              id="createBtn"
+              class="btn primary"
+              style="margin-top:6px; min-width:110px; display:inline-flex; justify-content:center;"
+            >
+              Create
+            </button>
+
+            <p id="createStatus" class="muted" style="margin-top:8px; min-height:18px; font-size:12px;"></p>
           </form>
         </div>
+
       </div>
     </div>
   </section>
 
-  <!-- PROJECTS LIST CARD -->
-  <section class="card" style="margin-top:22px;">
-    <div class="bd" style="padding:22px 28px;">
-      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:6px;">
-        <h2 class="h1" style="margin:0;">Projects</h2>
-        <div class="muted" style="font-size:13px;">{{ projects|length }} total</div>
+  <!-- PROJECTS LIST (reverted to the earlier table-style layout) -->
+  <section class="card">
+    <div style="padding:24px 32px 26px 32px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+        <h2 class="h1" style="margin-bottom:0;">Projects</h2>
+        <div class="muted" style="font-size:12px;">
+          {{ projects|length }} total
+        </div>
       </div>
 
-      <div class="projects-table">
-        <div class="projects-header">
-          <div>Project</div>
-          <div>Slug</div>
-          <div style="text-align:center;">Actions</div>
-          <div class="projects-created">Created</div>
-        </div>
+      <!-- column headers -->
+      <div style="
+        display:flex;
+        align-items:center;
+        margin-top:16px;
+        padding:0 4px 8px 4px;
+        font-size:11px;
+        text-transform:uppercase;
+        letter-spacing:.16em;
+        color:rgba(148,163,184,1);
+      ">
+        <div style="flex:2; min-width:0;">Project</div>
+        <div style="flex:2; min-width:0;">Slug</div>
+        <div style="flex:1; text-align:center;">Actions</div>
+        <div style="width:140px; text-align:right;">Created</div>
+      </div>
 
-        <div id="projects">
-          {% for p in projects %}
-          <div class="projects-row" data-row="{{ p.slug }}">
-            <div>
-              <div style="font-weight:600">{{ p.name }}</div>
-              <div class="muted">/{{ p.slug }}</div>
-            </div>
-
-            <div class="muted">
-              /{{ p.slug }}
-            </div>
-
-            <div class="projects-actions">
-              <a class="btn" href="/ui/{{ p.slug }}">View</a>
-              <button
-                class="btn"
-                style="color:#dc2626;border-color:#fecaca;background:#fff5f5"
-                data-delete="{{ p.slug }}"
-              >
-                Delete
-              </button>
-            </div>
-
-            <div class="projects-created muted">
-              {% if p.created_at %}
-                {{ p.created_at.strftime("%m/%d/%Y") }}
-              {% endif %}
-            </div>
+      <div id="projects">
+        {% for p in projects %}
+        <div
+          class="project-row"
+          data-name="{{ p.name | e }}"
+          data-slug="{{ p.slug | e }}"
+          style="
+            display:flex;
+            align-items:center;
+            padding:12px 4px;
+            border-top:1px solid var(--border);
+          "
+        >
+          <!-- project name -->
+          <div style="flex:2; min-width:0;">
+            <div style="font-weight:600; margin-bottom:2px;">{{ p.name }}</div>
           </div>
-          {% endfor %}
+
+          <!-- slug -->
+          <div style="flex:2; min-width:0;">
+            <div class="muted" style="font-size:13px;">/{{ p.slug }}</div>
+          </div>
+
+          <!-- actions -->
+          <div style="flex:1; display:flex; justify-content:center; gap:8px;">
+            <a class="btn" href="/ui/{{ p.slug }}">View</a>
+            <button
+              class="btn"
+              style="color:#dc2626; border-color:#fecaca; background:#fff5f5;"
+              data-delete="{{ p.slug }}"
+            >
+              Delete
+            </button>
+          </div>
+
+          <!-- created date -->
+          <div
+            style="width:140px; text-align:right; font-size:13px;"
+          >
+            {{ p.created_at.strftime("%m/%d/%Y") if p.created_at else "" }}
+          </div>
         </div>
+        {% endfor %}
       </div>
     </div>
   </section>
@@ -267,88 +296,93 @@
 </div>
 {% endblock %}
 
-{% block body_extra %}{% endblock %}
-
 {% block scripts %}
 <script>
-  function setBusy(btn, busy, labelWhenBusy) {
-    if (!btn) return;
-    if (busy) {
-      btn.dataset.originalLabel = btn.textContent;
-      if (labelWhenBusy) btn.textContent = labelWhenBusy;
-      btn.classList.add("btn-busy");
-      btn.disabled = true;
-    } else {
-      if (btn.dataset.originalLabel) {
-        btn.textContent = btn.dataset.originalLabel;
-      }
+  // helper to set a button into a "busy" state with spinner
+  function setBusy(btn, labelWhenBusy) {
+    if (!btn) return () => {};
+    const originalText = btn.textContent;
+    btn.textContent = labelWhenBusy;
+    btn.classList.add("btn-busy");
+    return () => {
+      btn.textContent = originalText;
       btn.classList.remove("btn-busy");
-      btn.disabled = false;
-    }
+    };
   }
 
-  const createForm = document.querySelector('#createForm');
-  const createStatus = document.querySelector('#createStatus');
-  const createBtn = document.querySelector('#createBtn');
-
-  // Create project with visual feedback
-  createForm.addEventListener('submit', async (e) => {
+  // CREATE PROJECT (with pending feedback)
+  document.querySelector('#createForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const name = e.target.name.value.trim();
-    if (!name) return;
+    const nameInput = e.target.name;
+    const name = nameInput.value.trim();
+    const status = document.querySelector("#createStatus");
+    const btn = document.querySelector("#createBtn");
 
-    setBusy(createBtn, true, "Creating…");
-    createStatus.textContent = "Creating project and updating MkDocs…";
+    if (!name) {
+      status.textContent = "Enter a project name first.";
+      return;
+    }
 
-    const payload = { name };
+    status.textContent = "Creating project and wiring MkDocs…";
+    const restore = setBusy(btn, "Creating…");
 
     try {
       const r = await fetch('/api/projects', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ name })
       });
 
       if (!r.ok) {
         const msg = await r.text();
-        createStatus.textContent = "Create failed: " + msg;
+        status.textContent = "Create failed: " + msg;
+        restore();
         return;
       }
 
-      createStatus.textContent = "Project created. Refreshing list…";
-      location.reload();
+      status.textContent = "Project created. MkDocs may take a few seconds to refresh.";
+      // Reload so the new project + stats reflect immediately
+      window.location.reload();
     } catch (err) {
       console.error(err);
-      createStatus.textContent = "Create failed: " + err.message;
-    } finally {
-      setBusy(createBtn, false);
+      status.textContent = "Create failed: " + err.message;
+      restore();
     }
   });
 
-  // Delete with busy feedback
+  // DELETE PROJECT (with pending feedback)
   document.querySelector('#projects').addEventListener('click', async (e) => {
     const btn = e.target.closest('[data-delete]');
     if (!btn) return;
 
     const slug = btn.getAttribute('data-delete');
-    if (!confirm(`Delete project "${slug}" and its generated files in docs?`)) return;
+    if (!slug) return;
 
-    setBusy(btn, true, "Deleting…");
+    if (!confirm(`Delete project "${slug}" and its generated files in docs?`)) {
+      return;
+    }
+
+    const restore = setBusy(btn, "Deleting…");
 
     try {
-      const r = await fetch(`/api/projects/${encodeURIComponent(slug)}`, { method:'DELETE' });
+      const r = await fetch(`/api/projects/${encodeURIComponent(slug)}`, {
+        method:'DELETE'
+      });
+
       if (!r.ok) {
         const msg = await r.text();
         alert('Delete failed: ' + msg);
-        setBusy(btn, false);
+        restore();
         return;
       }
-      const row = document.querySelector(`.projects-row[data-row="${slug}"]`);
+
+      // Optimistically remove row without full reload
+      const row = btn.closest('.project-row');
       if (row) row.remove();
     } catch (err) {
       console.error(err);
       alert('Delete failed: ' + err.message);
-      setBusy(btn, false);
+      restore();
     }
   });
 </script>
