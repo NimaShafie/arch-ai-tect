@@ -81,13 +81,13 @@ jobs:
         run: |
           set -e
           python3 - <<'PY'
-import pathlib
-root = pathlib.Path("packages")
-items = sorted([p.name for p in root.iterdir() if p.is_dir()])
-out = ["# Architecture Catalog", ""]
-out += [f"- [{s}](packages/{s}.md)" for s in items]
-pathlib.Path("docs/catalog.md").write_text("\n".join(out) + "\n", encoding="utf-8")
-PY
+          import pathlib
+          root = pathlib.Path("packages")
+          items = sorted([p.name for p in root.iterdir() if p.is_dir()])
+          out = ["# Architecture Catalog", ""]
+          out += [f"- [{s}](packages/{s}.md)" for s in items]
+          pathlib.Path("docs/catalog.md").write_text("\n".join(out) + "\n", encoding="utf-8")
+          PY
 
       - name: Validate intake is edited (fail fast if still template)
         shell: bash
@@ -216,20 +216,20 @@ PY
           base="${WORKBENCH_BASE:-https://workbench.shafie.org}"
           mkdir -p docs/projects
           python - <<'PY'
-import json, os, pathlib, urllib.request
-base = os.getenv("WORKBENCH_BASE") or "https://workbench.shafie.org"
-url  = base.rstrip("/") + "/api/projects"
-outf = pathlib.Path("docs/projects/projects.json")
-try:
-    with urllib.request.urlopen(url, timeout=12) as r:
-        items = json.load(r)
-    outf.write_text(json.dumps(items, indent=2), encoding="utf-8")
-except Exception as e:
-    print(f"::warning::Could not fetch {url}: {e}")
-    # keep previous JSON if present, otherwise write empty list
-    if not outf.exists():
-        outf.write_text("[]", encoding="utf-8")
-PY
+          import json, os, pathlib, urllib.request
+          base = os.getenv("WORKBENCH_BASE") or "https://workbench.shafie.org"
+          url  = base.rstrip("/") + "/api/projects"
+          outf = pathlib.Path("docs/projects/projects.json")
+          try:
+              with urllib.request.urlopen(url, timeout=12) as r:
+                  items = json.load(r)
+              outf.write_text(json.dumps(items, indent=2), encoding="utf-8")
+          except Exception as e:
+              print(f"::warning::Could not fetch {url}: {e}")
+              # keep previous JSON if present, otherwise write empty list
+              if not outf.exists():
+                  outf.write_text("[]", encoding="utf-8")
+          PY
 
       - name: Build site
         run: mkdocs build --strict
