@@ -159,13 +159,15 @@ def _build_diagram_doc(
     slug: str,
     diagram_title: str,
     plantuml_code: str,
+    image_rel_path: Path | None = None,
 ) -> str:
     """
     Build the *GitHub-facing* diagram markdown.
 
     - Link to the PlantUML viewer.
-    - Embed the PNG rendered by the PlantUML server.
+    - Embed the PNG (prefer local image_rel_path, fallback to PlantUML PNG).
     - Append a plain Markdown Requirements section.
+    - Append the PlantUML source as a fenced block.
     - Append the Source footer.
     """
     encoded = encode_plantuml(plantuml_code)
@@ -180,12 +182,27 @@ def _build_diagram_doc(
     out.append("")
     out.append(f"[Open in PlantUML]({viewer_url})")
     out.append("")
-    out.append(f"![{diagram_title}]({png_url})")
+
+    alt = f"{diagram_title} diagram"
+    if image_rel_path is not None:
+        out.append(f"![{alt}]({image_rel_path.as_posix()})")
+    else:
+        out.append(f"![{alt}]({png_url})")
     out.append("")
+
     out.append("## Requirements")
     out.append("")
     out.extend(bullets)
     out.append("")
+
+    # PlantUML source directly under Requirements
+    code_str = (plantuml_code or "").strip()
+    if code_str:
+        out.append("```plantuml")
+        out.append(code_str)
+        out.append("```")
+        out.append("")
+
     out.append("---")
     out.append("")
     out.append(
@@ -266,16 +283,29 @@ def sync_project_to_pipeline(slug: str, do_git: bool = True) -> dict:
         md_text = src.read_text(encoding="utf-8")
         code = _extract_plantuml_code(md_text)
 
-        diagram_slug = slugify(diagram_title)
-        out_path = diagrams_base_dir / f"{diagram_slug}.md"
+        # IMPORTANT: use the SAME base name as the project docs (underscores)
+        # so we overwrite docs/diagrams/test-2/c4_container.md etc.
+        out_stem = Path(filename).stem  # e.g. "c4_container"
+        out_path = diagrams_base_dir / f"{out_stem}.md"
+
+        # Image path follows existing convention:
+        # images/c4-container-diagram.png  (kebab-case + "-diagram.png")
+        image_name = out_stem.replace("_", "-") + "-diagram.png"
+        image_rel_path = Path("images") / image_name
 
         source_url = f"https://workbench.shafie.org/projects/{slug}/"
 
         if code:
-            doc = _build_diagram_doc(slug, diagram_title, code)
+            # Normal case: write full doc with Requirements + PlantUML block
+            doc = _build_diagram_doc(
+                slug,
+                diagram_title,
+                code,
+                image_rel_path=image_rel_path,
+            )
         else:
             # Fallback: no PlantUML block found; just copy the body and
-            # add a Source footer.
+            # add a Source footer (keep formatting simple).
             body_fallback = md_text.strip()
             doc_lines: list[str] = []
             doc_lines.append(f"# {diagram_title}")

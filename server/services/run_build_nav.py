@@ -278,7 +278,11 @@ def save_pipeline_png_from_body(body: str, dest: Path) -> None:
 
 
 # --- PlantUML → Mermaid helpers (for Workbench diagrams view) ----------------
-
+# (unchanged…)
+#  [all the plantuml_to_mermaid helpers and _inject_plantuml_link stay exactly
+#   as in your current file; omitted here only for brevity in this comment,
+#   but keep them as-is from your version above.]
+#   ↓↓↓
 
 def _is_sequence_diagram(code: str) -> bool:
     if "sequence diagram" in code.lower():
@@ -559,6 +563,18 @@ def plantuml_to_mermaid(code: str) -> str:
 
 
 def _inject_plantuml_link(body: str, section_title: str | None = None) -> str:
+    """
+    For each diagram markdown body (used on the MkDocs Projects pages):
+
+      - Detect the first ```plantuml``` or ```kroki-plantuml``` block
+      - Generate a PlantUML "Open in PlantUML" link
+      - Render a PNG from the PlantUML server
+      - Show a collapsible panel with JUST the PlantUML source
+      - Append the auto-generated requirements block
+
+    We do NOT wrap the entire original body anymore inside <details>,
+    because that can confuse MkDocs/Kroki processing and makes the UI noisy.
+    """
     match = _PLANTUML_BLOCK_RE.search(body)
     if not match:
         return body
@@ -575,8 +591,6 @@ def _inject_plantuml_link(body: str, section_title: str | None = None) -> str:
         f'<a href="{html.escape(viewer_url)}" '
         f'target="_blank" rel="noopener">Open in PlantUML</a>'
     )
-    if link_line in body:
-        return body
 
     alt_label = (section_title or "Diagram").strip()
     requirements_block = _generate_requirements_from_plantuml(code, section_title)
@@ -586,7 +600,7 @@ def _inject_plantuml_link(body: str, section_title: str | None = None) -> str:
         f"![{alt_label}]({png_url})\n\n"
         "<details>\n"
         "<summary>Show PlantUML source</summary>\n\n"
-        f"{body}\n\n"
+        f"```plantuml\n{code}\n```\n\n"
         "</details>\n\n"
         f"{requirements_block}\n"
     )
@@ -611,6 +625,11 @@ def build_pipeline_diagram_markdown(
       ![Diag](images/...)  (if image_rel_path provided)
       ## Requirements
       ...
+      ```plantuml
+      @startuml
+      ...
+      @enduml
+      ```
       ---
       _Source: generated from ArchAiTect Workbench(...)
 
@@ -660,6 +679,14 @@ def build_pipeline_diagram_markdown(
     out.append("")
     out.extend(bullets)
     out.append("")
+
+    # NEW: embed PlantUML source directly under Requirements (before the ---)
+    if code:
+        out.append("```plantuml")
+        out.append(code)
+        out.append("```")
+        out.append("")
+
     out.append("---")
     out.append("")
     out.append(
@@ -671,7 +698,8 @@ def build_pipeline_diagram_markdown(
 
 
 # --- Project index generation -------------------------------------------------
-
+# (everything below here stays exactly the same as your current file)
+#  [build_project_indexes(), main(), etc.]
 
 def _read_without_leading_title(path: Path) -> str:
     text = path.read_text(encoding="utf-8")
@@ -773,7 +801,7 @@ def build_project_indexes() -> None:
             lines.append("---")
             lines.append("")
 
-        # Send to Pipeline button (visuals unchanged)
+        # Send to Pipeline button and helpers (unchanged)
         lines.append(
             f'<button type="button" '
             f'onclick="awSendToPipeline(\'{slug}\')" '
@@ -784,7 +812,6 @@ def build_project_indexes() -> None:
         )
         lines.append("")
 
-        # Modal
         lines.append(
             f'<div id="aw-pipeline-modal-{slug}" '
             'style="display:none; position:fixed; inset:0; '
@@ -803,7 +830,6 @@ def build_project_indexes() -> None:
         )
         lines.append("")
 
-        # Hidden iframe (target for the request)
         lines.append(
             f'<iframe id="aw-pipeline-frame-{slug}" '
             f'name="aw-pipeline-frame-{slug}" '
@@ -811,7 +837,6 @@ def build_project_indexes() -> None:
         )
         lines.append("")
 
-        # Hidden form that does a GET to the pipeline endpoint
         lines.append(
             f'<form id="aw-pipeline-form-{slug}" '
             f'action="https://workbench.shafie.org/api/projects/{slug}/pipeline" '
@@ -822,7 +847,6 @@ def build_project_indexes() -> None:
         )
         lines.append("")
 
-        # JS helpers (styling preserved; behaviour improved, still using iframe)
         js = f"""
 <script>
 function awSendToPipeline(slug) {{
@@ -842,7 +866,6 @@ function awSendToPipeline(slug) {{
   const ghArch     = ghBase + '/docs/architecture';
   const ghDiagrams = ghBase + '/docs/diagrams/' + slug;
 
-  // Reset handlers so they don't stack up
   frame.onload = function () {{
     const ts = runAt.toLocaleString();
     statusEl.innerHTML =
