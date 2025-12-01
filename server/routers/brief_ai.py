@@ -11,10 +11,7 @@ from pydantic import BaseModel, Field
 # Environment configuration
 AI_API_BASE = os.getenv("AI_API_BASE", "").rstrip("/")
 AI_MODEL = os.getenv("AI_MODEL", "").strip()
-
-# IMPORTANT: this will hold your OpenWebUI JWT token, which we send as a cookie
-AI_API_KEY = os.getenv("AI_API_KEY", "").strip()  # optional
-
+AI_API_KEY = os.getenv("AI_API_KEY", "").strip()  # OpenWebUI API key (sk-...)
 
 router = APIRouter(tags=["ai-brief"])
 
@@ -37,12 +34,12 @@ def _build_messages(prompt: str) -> List[Dict[str, str]]:
         "DO NOT include Markdown or code fences. "
         "The JSON should have this shape:\n"
         "{\n"
-        '  \"project_name\": string,\n'
-        '  \"summary\": string,\n'
-        '  \"actors\": [ { \"name\": string, \"description\": string } ],\n'
-        '  \"primary_flows\": [ { \"name\": string, \"description\": string } ],\n'
-        '  \"non_functional\": [ string ],\n'
-        '  \"tech_preferences\": [ string ]\n'
+        '  "project_name": string,\n'
+        '  "summary": string,\n'
+        '  "actors": [ { "name": string, "description": string } ],\n'
+        '  "primary_flows": [ { "name": string, "description": string } ],\n'
+        '  "non_functional": [ string ],\n'
+        '  "tech_preferences": [ string ]\n'
         "}\n"
         "If the user is vague, make reasonable assumptions but keep them clearly labeled "
         "in the summary and flows."
@@ -58,9 +55,9 @@ async def _call_openwebui(prompt: str) -> Dict[str, Any]:
     """
     Call OpenWebUI's /api/chat/completions endpoint and return the parsed JSON body.
 
-    NOTE: newer OpenWebUI builds often expect the login JWT as a *cookie*
-    (token=<jwt>) instead of an Authorization header, so we mirror what the
-    browser does by sending AI_API_KEY as that cookie.
+    Auth mode: OpenWebUI API key
+      - URL:   http://127.0.0.1:3000/api/chat/completions
+      - Auth:  Authorization: Bearer sk-...
     """
     if not AI_API_BASE:
         raise HTTPException(
@@ -73,14 +70,12 @@ async def _call_openwebui(prompt: str) -> Dict[str, Any]:
             detail="AI backend model is not configured (AI_MODEL is missing).",
         )
 
+    # IMPORTANT: use /api/chat/completions (supports Bearer sk- API keys)
     url = f"{AI_API_BASE}/api/chat/completions"
 
-    # Always send JSON
-    headers: Dict[str, str] = {"Content-Type": "application/json"}
-
-    # If AI_API_KEY is set, treat it as the JWT and send as a cookie
+    headers = {"Content-Type": "application/json"}
     if AI_API_KEY:
-        headers["Cookie"] = f"token={AI_API_KEY}"
+        headers["Authorization"] = f"Bearer {AI_API_KEY}"
 
     payload = {
         "model": AI_MODEL,
@@ -99,7 +94,6 @@ async def _call_openwebui(prompt: str) -> Dict[str, Any]:
 
     # Non-200 from OpenWebUI
     if resp.status_code != 200:
-        # Try to surface OpenWebUI's error payload if JSON, otherwise raw text
         try:
             body = resp.json()
             body_str = json.dumps(body)
@@ -124,7 +118,7 @@ def _extract_brief_from_response(data: Dict[str, Any]) -> Dict[str, Any]:
     Extract and normalize the 'brief' from an OpenAI-style chat completion response.
 
     We expect OpenWebUI's /api/chat/completions to return an OpenAI-compatible payload:
-      { \"choices\": [ { \"message\": { \"content\": \"...\" } } ] }
+      { "choices": [ { "message": { "content": "..." } } ] }
 
     The content should be JSON matching our brief schema. If not, we fall back to a
     generic wrapper so the user still sees the raw text and can edit it.
@@ -133,7 +127,6 @@ def _extract_brief_from_response(data: Dict[str, Any]) -> Dict[str, Any]:
     try:
         content = data["choices"][0]["message"]["content"]
     except Exception:
-        # If the shape is different, just dump the whole object
         return {
             "raw_response": data,
             "note": (
@@ -166,11 +159,9 @@ def _extract_brief_from_response(data: Dict[str, Any]) -> Dict[str, Any]:
             "raw_text": content,
         }
 
-    # If the model already returned the full brief object, just use it
     if isinstance(parsed, dict):
         return parsed
 
-    # Anything else (e.g., list or string) gets wrapped
     return {
         "project_name": "",
         "summary": "AI draft (non-object JSON – please normalize).",

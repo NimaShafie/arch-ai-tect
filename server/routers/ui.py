@@ -28,14 +28,17 @@ REPO_ROOT = DOCS_ROOT.parent
 
 def _trigger_docs_refresh() -> None:
     """
-    Best-effort: run the same nav/index builder you currently call manually.
+    Best-effort: keep MkDocs in sync with project changes.
 
-    This invokes:
-        python -m server.services.run_build_nav
+    1) Run the same nav/index builder you call manually:
+           python -m server.services.run_build_nav
 
-    which rebuilds the MkDocs project nav + combined project index pages.
-    Any errors are swallowed so the UI doesn't break if docs rebuild fails.
+    2) Restart the 'docs' container so MkDocs picks up the changes:
+           docker compose -f compose/docker-compose.yml restart docs
+
+    Any errors are swallowed so project create/delete flows never break.
     """
+    # Step 1: rebuild nav + combined project index pages
     try:
         subprocess.run(
             [
@@ -49,8 +52,28 @@ def _trigger_docs_refresh() -> None:
             stderr=subprocess.DEVNULL,
         )
     except Exception:
-        # Don't break project create/delete flows if docs rebuild fails.
-        # You can still run the command manually if needed.
+        # You can still run this manually if something goes wrong.
+        pass
+
+    # Step 2: restart docs container (same as your manual fix)
+    try:
+        subprocess.run(
+            [
+                "docker",
+                "compose",
+                "-f",
+                "compose/docker-compose.yml",
+                "restart",
+                "docs",
+            ],
+            cwd=str(REPO_ROOT),
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        # If Docker is unavailable or restart fails, ignore it.
+        # Worst case: you fall back to your manual restart.
         pass
 
 
@@ -183,7 +206,8 @@ def api_create_project(payload: ProjectCreate, session=Depends(get_session)):
     except Exception:
         pass
 
-    # NEW: best-effort full docs refresh (projects index + per-project index)
+    # NEW: best-effort full docs refresh (projects index + per-project index
+    # + MkDocs container restart so docs.shafie.org reflects the change)
     _trigger_docs_refresh()
 
     return {
@@ -234,7 +258,7 @@ def api_delete_project(slug: str, session=Depends(get_session)):
     except Exception:
         pass
 
-    # NEW: also rebuild combined project index pages so docs site updates
+    # NEW: also rebuild combined project index pages and restart docs container
     _trigger_docs_refresh()
 
     return {"status": "ok", "slug": slug}

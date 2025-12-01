@@ -8,7 +8,7 @@ Use this page as the hub to jump into each project's package docs and diagrams.
 
 - [Disney+AI+V3](/projects/disney-ai-v3/)
 - [test-2](/projects/test-2/)
-- [foo-fest](/projects/foo-fest/)
+- [test-3](/projects/test-3/)
 
 ---
 
@@ -40,14 +40,14 @@ Use this page as the hub to jump into each project's package docs and diagrams.
 
 ---
 
-## [foo-fest](/projects/foo-fest/)
+## [test-3](/projects/test-3/)
 
 **Created:** 2025-12-01  
-**Slug:** `foo-fest`  
+**Slug:** `test-3`  
 **Summary:** Architecture workspace managed by the ArchAiTect Workbench.
 
 | Category     | Links |
 | ------------ | ----- |
-| Package docs | [Spec](/projects/foo-fest/package/spec.md) · [SRS](/projects/foo-fest/package/srs.md) · [Ref Arch](/projects/foo-fest/package/reference-arch.md) · [Impl Guide](/projects/foo-fest/package/implementation-guide.md) |
-| Diagrams     | [C4 Context](/projects/foo-fest/diagrams/c4_context.md) · [C4 Container](/projects/foo-fest/diagrams/c4_container.md) · [C4 Component](/projects/foo-fest/diagrams/c4_component.md) · [Logical](/projects/foo-fest/diagrams/logical.md) · [Deployment](/projects/foo-fest/diagrams/deployment.md) · [Sequence](/projects/foo-fest/diagrams/sequence.md) |
+| Package docs | [Spec](/projects/test-3/package/spec.md) · [SRS](/projects/test-3/package/srs.md) · [Ref Arch](/projects/test-3/package/reference-arch.md) · [Impl Guide](/projects/test-3/package/implementation-guide.md) |
+| Diagrams     | [C4 Context](/projects/test-3/diagrams/c4_context.md) · [C4 Container](/projects/test-3/diagrams/c4_container.md) · [C4 Component](/projects/test-3/diagrams/c4_component.md) · [Logical](/projects/test-3/diagrams/logical.md) · [Deployment](/projects/test-3/diagrams/deployment.md) · [Sequence](/projects/test-3/diagrams/sequence.md) |
 
