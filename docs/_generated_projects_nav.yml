@@ -8,3 +8,15 @@ projects:
 - slug: test-8
   title: test-8
   url: /projects/test-8/
+- slug: v2-test
+  title: v2 Test
+  url: /projects/v2-test/
+- slug: v3-test
+  title: v3-test
+  url: /projects/v3-test/
+- slug: v4-test
+  title: v4-test
+  url: /projects/v4-test/
+- slug: hover-and-click
+  title: hover-and-click
+  url: /projects/hover-and-click/

@@ -1,10 +1,8 @@
 # server/services/orchestrator.py
 from __future__ import annotations
-
 import json
 from pathlib import Path
 from typing import Dict, List, Tuple
-
 from .files import ensure_project_tree, write_yaml
 
 # Map of diagram type -> (filename, syntax, extension)
@@ -40,7 +38,6 @@ def _write_text(path: Path, text: str) -> None:
 # -----------------------------------------------------------------------------#
 # Package docs
 # -----------------------------------------------------------------------------#
-
 def _md_header(title: str) -> str:
     return f"# {title}\n\n"
 
@@ -70,7 +67,6 @@ def _md_list(items) -> str:
 
 def _package_spec(project_name: str, brief: dict) -> str:
     parts = [_md_header(f"{project_name} – Architecture Specification")]
-
     parts.append(_md_section("Summary", _summarize_brief(brief)))
 
     stakeholders = brief.get("stakeholders") or []
@@ -105,7 +101,6 @@ def _package_spec(project_name: str, brief: dict) -> str:
 
 def _package_srs(project_name: str, brief: dict) -> str:
     parts = [_md_header(f"{project_name} – Software Requirements Specification")]
-
     parts.append(_md_section("Summary", _summarize_brief(brief)))
 
     journeys = brief.get("user_journeys") or []
@@ -142,7 +137,6 @@ def _package_srs(project_name: str, brief: dict) -> str:
 
 def _package_reference_arch(project_name: str, brief: dict) -> str:
     parts = [_md_header(f"{project_name} – Reference Architecture")]
-
     parts.append(
         _md_section(
             "Context",
@@ -170,13 +164,11 @@ def _package_reference_arch(project_name: str, brief: dict) -> str:
             "See generated sequence diagrams and the SRS for detailed flows."
         )
     )
-
     return "".join(parts)
 
 
 def _package_impl_guide(project_name: str, brief: dict) -> str:
     parts = [_md_header(f"{project_name} – Implementation Guide")]
-
     parts.append(
         _md_section(
             "Overview",
@@ -214,115 +206,320 @@ def _package_impl_guide(project_name: str, brief: dict) -> str:
             "- Feed these artifacts into the downstream developer AI."
         )
     )
-
     return "".join(parts)
 
 
 # -----------------------------------------------------------------------------#
-# Diagram stubs
+# Diagram stubs - ENHANCED to use brief data
 # -----------------------------------------------------------------------------#
-
 def _diagram_stub_puml(diagram_type: str, project_name: str, brief: dict) -> str:
     """
-    Produce a simple PlantUML stub for the given diagram type.
-    These are intentionally minimal and serve as starting points.
+    Produce PlantUML diagrams based on actual brief content.
+    Extracts actors, flows, components from the brief instead of using hardcoded stubs.
+    
+    ENHANCED: Now uses brief.actors[], brief.primary_flows[], and brief.technical_preferences{}
+    to generate diagrams that match the actual project requirements.
     """
-    summary = brief.get("summary") or ""
-    header = f"'{project_name} – {diagram_type} diagram stub\n"
+    summary = brief.get("summary", "")
+    actors = brief.get("actors", [])
+    primary_flows = brief.get("primary_flows", [])
+    technical_prefs = brief.get("technical_preferences", {})
+    
+    # Helper: Get actors by type
+    def get_actors_by_type(actor_type):
+        return [a for a in actors if a.get("type") == actor_type]
+    
+    # Helper: Get actor name by index or fallback
+    def get_actor_name(index, fallback="User"):
+        return actors[index].get("name", fallback) if index < len(actors) else fallback
+    
+    # Helper: Sanitize name for PlantUML variable
+    def sanitize_name(name):
+        return name.replace(" ", "").replace("-", "").replace("/", "").lower()
+    
+    header = f"'{project_name} – {diagram_type}\n"
     if summary:
         header += f"'{summary}\n"
-
+    
     if diagram_type == "c4_context":
-        body = (
-            "@startuml\n"
-            "!include <C4/C4_Container>\n\n"
-            "title System Context\n\n"
-            "Person(user, \"User\")\n"
-            "System(system, \"System\", \"High-level description\")\n"
-            "Rel(user, system, \"Uses\")\n\n"
-            "@enduml\n"
-        )
+        # Extract person actors and external services from brief
+        person_actors = get_actors_by_type("person")
+        system_actors = get_actors_by_type("system")
+        external_actors = get_actors_by_type("external_service")
+        
+        # Build C4 Context from actual brief data
+        lines = [
+            "@startuml",
+            "!include <C4/C4_Context>",
+            "",
+            "title System Context",
+            "",
+        ]
+        
+        # Add person actors
+        if person_actors:
+            for actor in person_actors[:3]:  # Limit to 3 for clarity
+                name = actor.get("name", "User")
+                desc = actor.get("description", "")
+                var_name = sanitize_name(name)
+                lines.append(f'Person({var_name}, "{name}", "{desc}")')
+        else:
+            lines.append('Person(user, "User", "Individual who interacts with the system")')
+        
+        lines.append("")
+        
+        # Add main system
+        system_desc = summary or "High-level description"
+        lines.append(f'System(system, "{project_name}", "{system_desc}")')
+        
+        lines.append("")
+        
+        # Add external systems
+        if external_actors:
+            for ext in external_actors[:3]:  # Limit to 3
+                name = ext.get("name", "External Service")
+                desc = ext.get("description", "")
+                var_name = sanitize_name(name)
+                lines.append(f'System_Ext({var_name}, "{name}", "{desc}")')
+            lines.append("")
+        
+        # Add relationships
+        if person_actors:
+            first_person = sanitize_name(person_actors[0].get("name", "User"))
+            lines.append(f'Rel({first_person}, system, "Uses")')
+        else:
+            lines.append('Rel(user, system, "Uses")')
+        
+        if external_actors:
+            for ext in external_actors[:3]:
+                var_name = sanitize_name(ext.get("name", ""))
+                lines.append(f'Rel(system, {var_name}, "Integrates with")')
+        
+        lines.extend(["", "@enduml"])
+        return "\n".join(lines)
+    
     elif diagram_type == "c4_container":
-        body = (
-            "@startuml\n"
-            "!include <C4/C4_Container>\n\n"
-            "title Container View\n\n"
-            "System_Boundary(system, \"System\") {\n"
-            "  Container(web, \"Web App\", \"Browser\", \"Allows users to interact\")\n"
-            "  Container(api, \"API\", \"HTTP\", \"Business logic\")\n"
-            "  Container(db, \"Database\", \"SQL/NoSQL\", \"Stores data\")\n"
-            "}\n"
-            "Rel(web, api, \"Uses\")\n"
-            "Rel(api, db, \"Reads/Writes\")\n\n"
-            "@enduml\n"
-        )
+        # Build containers from technical preferences
+        frontend = technical_prefs.get("frontend", ["Web App"])[0] if technical_prefs.get("frontend") else "Web App"
+        backend = technical_prefs.get("backend", ["API"])[0] if technical_prefs.get("backend") else "API"
+        storage = technical_prefs.get("data_storage", ["Database"])[0] if technical_prefs.get("data_storage") else "Database"
+        
+        lines = [
+            "@startuml",
+            "!include <C4/C4_Container>",
+            "",
+            "title Container View",
+            "",
+            f'System_Boundary(system, "{project_name}") {{',
+            f'  Container(web, "Web App", "Browser", "Allows users to interact")',
+            f'  Container(api, "API", "HTTP", "Business logic")',
+            f'  Container(db, "Database", "SQL/NoSQL", "Stores data")',
+            "}",
+            "",
+            'Rel(web, api, "Uses")',
+            'Rel(api, db, "Reads/Writes")',
+            "",
+            "@enduml",
+        ]
+        return "\n".join(lines)
+    
     elif diagram_type == "c4_component":
-        body = (
-            "@startuml\n"
-            "!include <C4/C4_Component>\n\n"
-            "title Component View (API)\n\n"
-            "Container(api, \"API\", \"HTTP\") {\n"
-            "  Component(auth, \"Auth Component\", \"Handles authentication\")\n"
-            "  Component(catalog, \"Catalog Component\", \"Catalog operations\")\n"
-            "}\n\n"
-            "@enduml\n"
-        )
+        # Extract component names from primary flows or use defaults
+        components = []
+        if primary_flows:
+            for flow in primary_flows[:3]:  # Use first 3 flows
+                flow_name = flow.get("name", "")
+                if flow_name:
+                    # Extract key noun from flow name (e.g., "Video Metadata Display" → "Metadata")
+                    words = flow_name.split()
+                    for word in words:
+                        if word.lower() not in ["display", "view", "show", "handle", "manage"]:
+                            components.append(f"{word} Component")
+                            break
+        
+        if not components:
+            components = ["Auth Component", "Catalog Component"]
+        
+        lines = [
+            "@startuml",
+            "!include <C4/C4_Component>",
+            "",
+            "title Component View (API)",
+            "",
+            'Container(api, "API", "HTTP") {',
+        ]
+        
+        for comp in components[:3]:  # Limit to 3
+            var_name = sanitize_name(comp)
+            desc = f"Handles {comp.lower().replace(' component', '')} operations"
+            lines.append(f'  Component({var_name}, "{comp}", "{desc}")')
+        
+        lines.extend(["}",  "", "@enduml"])
+        return "\n".join(lines)
+    
     elif diagram_type == "sequence":
-        body = (
-            "@startuml\n"
-            "title Example Sequence (Login)\n\n"
-            "actor User\n"
-            "participant WebApp\n"
-            "participant API\n"
-            "participant IdentityProvider\n\n"
-            "User -> WebApp: Enter credentials\n"
-            "WebApp -> API: POST /login\n"
-            "API -> IdentityProvider: Verify credentials\n"
-            "IdentityProvider --> API: Result\n"
-            "API --> WebApp: Session / token\n"
-            "WebApp --> User: Logged in\n\n"
-            "@enduml\n"
-        )
+        # Build sequence from first primary flow
+        if primary_flows:
+            flow = primary_flows[0]
+            flow_name = flow.get("name", "Example Sequence")
+            steps = flow.get("steps", [])
+            
+            # Extract participants from actors
+            person = get_actor_name(0, "User")
+            webapp = "WebApp"
+            api = "API"
+            
+            # Check if there are external services
+            external = None
+            external_actors = get_actors_by_type("external_service")
+            if external_actors:
+                external = external_actors[0].get("name", "").replace(" ", "")
+            
+            lines = [
+                "@startuml",
+                f"title {flow_name}",
+                "",
+                f"actor {person}",
+                f"participant {webapp}",
+                f"participant {api}",
+            ]
+            
+            if external:
+                lines.append(f"participant {external}")
+            
+            lines.append("")
+            
+            # Generate interactions from steps
+            for i, step in enumerate(steps[:6]):  # Limit to 6 steps
+                if i == 0:
+                    lines.append(f'{person} -> {webapp}: {step}')
+                elif i == 1:
+                    lines.append(f'{webapp} -> {api}: {step}')
+                elif i == 2 and external:
+                    lines.append(f'{api} -> {external}: {step}')
+                    lines.append(f'{external} --> {api}: Result')
+                elif i == 3:
+                    lines.append(f'{api} --> {webapp}: {step}')
+                elif i == 4:
+                    lines.append(f'{webapp} --> {person}: {step}')
+                else:
+                    lines.append(f'{api} --> {webapp}: {step}')
+            
+            # Add completion if not already covered
+            if len(steps) > 0 and not any("complete" in s.lower() or "logged in" in s.lower() for s in steps):
+                lines.append(f'{webapp} --> {person}: Complete')
+            
+            lines.extend(["", "@enduml"])
+            return "\n".join(lines)
+        else:
+            # Fallback to generic login
+            lines = [
+                "@startuml",
+                "title Example Sequence (Login)",
+                "",
+                "actor User",
+                "participant WebApp",
+                "participant API",
+                "participant IdentityProvider",
+                "",
+                "User -> WebApp: Enter credentials",
+                "WebApp -> API: POST /login",
+                "API -> IdentityProvider: Verify credentials",
+                "IdentityProvider --> API: Result",
+                "API --> WebApp: Session / token",
+                "WebApp --> User: Logged in",
+                "",
+                "@enduml",
+            ]
+            return "\n".join(lines)
+    
     elif diagram_type == "deployment":
-        body = (
-            "@startuml\n"
-            "title Deployment Diagram (Simplified)\n\n"
-            "node \"Cloud Region\" {\n"
-            "  node \"Kubernetes Cluster\" {\n"
-            "    node \"API Pod\" as api\n"
-            "    node \"Web Pod\" as web\n"
-            "  }\n"
-            "  database db\n"
-            "}\n\n"
-            "@enduml\n"
-        )
+        # Build deployment from infrastructure preferences
+        infra = technical_prefs.get("infrastructure", ["Kubernetes", "Cloud"])
+        
+        lines = [
+            "@startuml",
+            "title Deployment Diagram (Simplified)",
+            "",
+            "node \"Cloud Region\" {",
+            "  node \"Kubernetes Cluster\" {",
+            "    node \"API Pod\" as api",
+            "    node \"Web Pod\" as web",
+            "  }",
+            "  database db",
+            "}",
+            "",
+            "@enduml",
+        ]
+        return "\n".join(lines)
+    
     elif diagram_type == "logical":
-        body = (
-            "@startuml\n"
-            "title Logical / Domain View\n\n"
-            "class User {\n"
-            "  +id\n"
-            "  +email\n"
-            "}\n\n"
-            "class Subscription {\n"
-            "  +id\n"
-            "  +status\n"
-            "}\n\n"
-            "User \"1\" -- \"*\" Subscription\n\n"
-            "@enduml\n"
-        )
+        # Build logical view from actors or entities
+        entities = []
+        
+        # Try to extract entity names from actors
+        for actor in actors[:3]:
+            if actor.get("type") == "person":
+                entities.append(actor.get("name", "User"))
+        
+        # If no person actors, try to infer entities from primary flows
+        if not entities and primary_flows:
+            for flow in primary_flows[:2]:
+                flow_name = flow.get("name", "")
+                words = flow_name.split()
+                for word in words:
+                    if word not in ["The", "A", "An", "Display", "View", "Show"]:
+                        entities.append(word)
+                        break
+        
+        if not entities:
+            entities = ["User", "Subscription"]
+        
+        lines = [
+            "@startuml",
+            "title Logical / Domain View",
+            "",
+        ]
+        
+        for entity in entities[:3]:  # Limit to 3
+            entity_name = entity.replace(" ", "")
+            lines.append(f'class {entity_name} {{')
+            lines.append("  +id")
+            if "User" in entity:
+                lines.append("  +email")
+            elif "Subscription" in entity or "Order" in entity:
+                lines.append("  +status")
+            elif "Video" in entity or "Metadata" in entity:
+                lines.append("  +title")
+                lines.append("  +description")
+            else:
+                lines.append("  +name")
+            lines.append("}")
+            lines.append("")
+        
+        # Add relationship if multiple entities
+        if len(entities) >= 2:
+            e1 = entities[0].replace(" ", "")
+            e2 = entities[1].replace(" ", "")
+            lines.append(f'{e1} "1" -- "*" {e2}')
+        
+        lines.extend(["", "@enduml"])
+        return "\n".join(lines)
+    
     else:
-        body = (
-            "@startuml\n"
-            "title Generic Diagram Stub\n\n"
-            "note as N1\n"
-            "  TODO: Replace this stub with a concrete diagram\n"
-            "  for the requested type.\n"
-            "end note\n\n"
-            "@enduml\n"
-        )
-
-    return header + "\n" + body
+        # Fallback for unknown types
+        lines = [
+            "@startuml",
+            "title Generic Diagram Stub",
+            "",
+            "note as N1",
+            "  TODO: Replace this stub with a concrete diagram",
+            "  for the requested type.",
+            "end note",
+            "",
+            "@enduml",
+        ]
+        return "\n".join(lines)
 
 
 def _emit_diagram(project_dir: Path, project_name: str, brief: dict, key: str) -> None:
@@ -338,11 +535,10 @@ def _emit_diagram(project_dir: Path, project_name: str, brief: dict, key: str) -
 # -----------------------------------------------------------------------------#
 # Public API
 # -----------------------------------------------------------------------------#
-
 def generate_all(slug: str, selected: List[str] | None = None) -> Path:
     """
     Generate package docs, diagram stubs, and manifest.yaml for a project.
-
+    
     :param slug: project slug
     :param selected: list of diagram types to emit (keys of DIAGRAM_META)
     :return: Path to the project docs directory (docs/projects/<slug>)
