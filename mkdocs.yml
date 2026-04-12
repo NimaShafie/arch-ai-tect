@@ -26,7 +26,8 @@ markdown_extensions:
 plugins:
 - search
 - macros
-- kroki: null
+- kroki:
+    ServerURL: http://kroki:8000
 - exclude:
     glob:
     - package/**

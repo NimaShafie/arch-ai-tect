@@ -597,10 +597,10 @@ def _inject_plantuml_link(body: str, section_title: str | None = None) -> str:
 
     wrapped_body = (
         f"{link_line}\n\n"
-        f"![{alt_label}]({png_url})\n\n"
+        f"```kroki-plantuml\n{code}\n```\n\n"
         "<details>\n"
         "<summary>Show PlantUML source</summary>\n\n"
-        f"```plantuml\n{code}\n```\n\n"
+        f"```text\n{code}\n```\n\n"
         "</details>\n\n"
         f"{requirements_block}\n"
     )
@@ -801,102 +801,131 @@ def build_project_indexes() -> None:
             lines.append("---")
             lines.append("")
 
-        # Send to Pipeline button and helpers (unchanged)
+        # Send to Pipeline button (opens repo-config modal)
         lines.append(
             f'<button type="button" '
             f'onclick="awSendToPipeline(\'{slug}\')" '
-            'style="padding:8px 16px; border-radius:4px; border:none; '
-            'background:#1a73e8; color:#fff; cursor:pointer; margin-top:24px;">'
+            'style="padding:8px 18px; border-radius:6px; border:none; '
+            'background:#1a73e8; color:#fff; cursor:pointer; '
+            'font-size:0.9rem; font-weight:600; margin-top:24px;">'
             "Send to Pipeline"
             "</button>"
         )
         lines.append("")
 
+        # Modal with repo + token inputs
         lines.append(
             f'<div id="aw-pipeline-modal-{slug}" '
             'style="display:none; position:fixed; inset:0; '
-            'background:rgba(0,0,0,0.35); z-index:9999;">'
-            '<div style="max-width:520px; margin:10% auto; background:#fff; '
-            'border-radius:8px; padding:16px 20px; box-shadow:0 4px 16px rgba(0,0,0,0.25);">'
-            '<div style="font-weight:700; margin-bottom:8px;">Pipeline Status</div>'
+            'background:rgba(0,0,0,0.45); z-index:9999;">'
+            '<div style="background:#fff; border-radius:10px; '
+            'padding:24px 28px; width:100%; max-width:500px; '
+            'margin:8% auto; box-shadow:0 8px 32px rgba(0,0,0,0.22);">'
+            '<div style="font-size:1.1rem; font-weight:700; '
+            'margin-bottom:16px;">Send to GitHub Pipeline</div>'
+
+            '<label style="display:block; font-size:0.85rem; '
+            'color:#555; margin-bottom:4px;">'
+            'GitHub Repository (owner/repo)</label>'
+            f'<input id="aw-gh-repo-{slug}" type="text" '
+            'placeholder="e.g. NimaShafie/test-repo" '
+            'style="width:100%; box-sizing:border-box; padding:8px 10px; '
+            'border:1px solid #ccc; border-radius:6px; font-size:0.9rem; '
+            'margin-bottom:14px;" />'
+
+            '<label style="display:block; font-size:0.85rem; '
+            'color:#555; margin-bottom:4px;">'
+            'GitHub Personal Access Token</label>'
+            f'<input id="aw-gh-token-{slug}" type="password" '
+            'placeholder="ghp_... (requires Contents: Write)" '
+            'style="width:100%; box-sizing:border-box; padding:8px 10px; '
+            'border:1px solid #ccc; border-radius:6px; font-size:0.9rem; '
+            'margin-bottom:14px;" />'
+
             f'<div id="aw-pipeline-status-{slug}" '
-            'class="md-typeset" '
-            'style="font-size:0.9rem; line-height:1.4;"></div>'
-            '<div style="margin-top:16px; text-align:right;">'
+            'style="font-size:0.88rem; min-height:20px; '
+            'margin-bottom:14px;"></div>'
+
+            '<div style="display:flex; justify-content:flex-end; gap:10px;">'
             f'<button type="button" onclick="awClosePipeline(\'{slug}\')" '
-            'style="padding:6px 12px; border-radius:4px; border:none; '
-            'background:#e0e0e0; cursor:pointer;">Close</button>'
-            "</div></div></div>"
+            'style="padding:8px 16px; border-radius:6px; '
+            'border:1px solid #ccc; background:#f5f5f5; '
+            'cursor:pointer; font-size:0.9rem;">Cancel</button>'
+            f'<button id="aw-pipeline-submit-{slug}" type="button" '
+            f'onclick="awSubmitPipeline(\'{slug}\')" '
+            'style="padding:8px 18px; border-radius:6px; border:none; '
+            'background:#1a73e8; color:#fff; cursor:pointer; '
+            'font-size:0.9rem; font-weight:600;">Push to GitHub</button>'
+            '</div>'
+            '</div></div>'
         )
         lines.append("")
 
-        lines.append(
-            f'<iframe id="aw-pipeline-frame-{slug}" '
-            f'name="aw-pipeline-frame-{slug}" '
-            'style="display:none; width:0; height:0; border:none;"></iframe>'
-        )
-        lines.append("")
-
-        lines.append(
-            f'<form id="aw-pipeline-form-{slug}" '
-            f'action="https://workbench.shafie.org/api/projects/{slug}/pipeline" '
-            f'method="get" target="aw-pipeline-frame-{slug}" '
-            'style="display:none;">'
-            '<input type="hidden" name="source" value="docs.shafie.org" />'
-            "</form>"
-        )
-        lines.append("")
-
-        js = f"""
+        js = """
 <script>
-function awSendToPipeline(slug) {{
-  const modal    = document.getElementById('aw-pipeline-modal-' + slug);
-  const statusEl = document.getElementById('aw-pipeline-status-' + slug);
-  const frame    = document.getElementById('aw-pipeline-frame-' + slug);
-  const form     = document.getElementById('aw-pipeline-form-' + slug);
-  if (!modal || !statusEl || !frame || !form) return;
-
-  const runAt = new Date();
-
+function awSendToPipeline(slug) {
+  var modal = document.getElementById('aw-pipeline-modal-' + slug);
+  if (!modal) return;
+  var repoInput = document.getElementById('aw-gh-repo-' + slug);
+  var tokenInput = document.getElementById('aw-gh-token-' + slug);
+  var statusEl = document.getElementById('aw-pipeline-status-' + slug);
+  if (repoInput) repoInput.value = localStorage.getItem('aw-gh-repo-' + slug) || '';
+  if (tokenInput) tokenInput.value = '';
+  if (statusEl) statusEl.innerHTML = '';
   modal.style.display = 'block';
-  statusEl.textContent =
-    'Triggering the pipeline export for this project…';
-
-  const ghBase     = 'https://github.com/SevDev21/disney-ai-plus/tree/master';
-  const ghArch     = ghBase + '/docs/architecture';
-  const ghDiagrams = ghBase + '/docs/diagrams/' + slug;
-
-  frame.onload = function () {{
-    const ts = runAt.toLocaleString();
-    statusEl.innerHTML =
-      '<p>The pipeline export request was sent successfully.</p>' +
-      '<p>If there were changes, you should see a new commit in GitHub within a few seconds.</p>' +
-      '<p><strong>Last export run at:</strong> ' + ts + '</p>' +
-      '<p>Quick links:</p>' +
-      '<ul>' +
-      '<li><a href="' + ghArch + '" target="_blank" rel="noopener">Architecture docs folder</a></li>' +
-      '<li><a href="' + ghDiagrams + '" target="_blank" rel="noopener">Diagrams for this project</a></li>' +
-      '</ul>';
-  }};
-  frame.onerror = function () {{
-    const ts = runAt.toLocaleString();
-    const pipelineUrl = form.action + '?source=docs.shafie.org';
-    statusEl.innerHTML =
-      '<p style="color:#b00020; font-weight:600;">' +
-      'The pipeline request failed or returned an unexpected response.' +
-      '</p>' +
-      '<p>You can retry from this page, or open the pipeline endpoint directly:</p>' +
-      '<p><a href="' + pipelineUrl + '" target="_blank" rel="noopener">' +
-      pipelineUrl + '</a></p>' +
-      '<p><strong>Last attempted run at:</strong> ' + ts + '</p>';
-  }};
-
-  form.submit();
-}}
-function awClosePipeline(slug) {{
-  const modal = document.getElementById('aw-pipeline-modal-' + slug);
+}
+function awClosePipeline(slug) {
+  var modal = document.getElementById('aw-pipeline-modal-' + slug);
   if (modal) modal.style.display = 'none';
-}}
+}
+async function awSubmitPipeline(slug) {
+  var repoInput = document.getElementById('aw-gh-repo-' + slug);
+  var tokenInput = document.getElementById('aw-gh-token-' + slug);
+  var statusEl = document.getElementById('aw-pipeline-status-' + slug);
+  var submitBtn = document.getElementById('aw-pipeline-submit-' + slug);
+  if (!repoInput || !tokenInput || !statusEl || !submitBtn) return;
+  var repo = repoInput.value.trim();
+  var token = tokenInput.value.trim();
+  if (!repo || !token) {
+    statusEl.innerHTML = '<span style="color:#b00020;">Please fill in both fields.</span>';
+    return;
+  }
+  if (repo.indexOf('/') === -1) {
+    statusEl.innerHTML = '<span style="color:#b00020;">Repository must be in owner/repo format (e.g. NimaShafie/test-repo).</span>';
+    return;
+  }
+  localStorage.setItem('aw-gh-repo-' + slug, repo);
+  submitBtn.disabled = true;
+  statusEl.innerHTML = '<span style="color:#555;">Pushing to GitHub\u2026</span>';
+  try {
+    var resp = await fetch('https://workbench.shafie.org/api/projects/' + slug + '/pipeline', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      credentials: 'include',
+      body: JSON.stringify({repo: repo, token: token})
+    });
+    var data = null;
+    try { data = await resp.json(); } catch(e) {}
+    if (!resp.ok) {
+      var detail = (data && data.detail) ? data.detail : ('HTTP ' + resp.status);
+      statusEl.innerHTML = '<span style="color:#b00020;font-weight:600;">Push failed: ' + detail + '</span>';
+      return;
+    }
+    var commitUrl = data.commit_url || '#';
+    var commitShort = data.commit || '';
+    var repoUrl = data.repo_url || ('https://github.com/' + repo);
+    var fileCount = (data.files_pushed || []).length;
+    statusEl.innerHTML =
+      '<span style="color:#065f46;font-weight:600;">\u2713 Successfully pushed to GitHub!</span>' +
+      '<br/><strong>Commit:</strong> <a href="' + commitUrl + '" target="_blank" rel="noopener">' + commitShort + '</a>' +
+      '<br/><strong>Repository:</strong> <a href="' + repoUrl + '" target="_blank" rel="noopener">' + repo + '</a>' +
+      '<br/><strong>Files pushed:</strong> ' + fileCount;
+  } catch(err) {
+    statusEl.innerHTML = '<span style="color:#b00020;">Network error: ' + err.message + '</span>';
+  } finally {
+    submitBtn.disabled = false;
+  }
+}
 </script>
 """.strip()
 

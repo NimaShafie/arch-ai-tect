@@ -30,8 +30,8 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["https://docs.shafie.org"],
-        allow_credentials=True,              # <-- changed from False
-        allow_methods=["GET", "OPTIONS"],    # GET + preflight are enough
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["*"],
     )
 

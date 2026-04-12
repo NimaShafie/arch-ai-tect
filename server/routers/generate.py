@@ -10,7 +10,6 @@ from pydantic import BaseModel
 
 from server.schemas import DiagramChoices
 from server.services.orchestrator import generate_all, _diagram_stub_puml
-from server.services.pipeline_export import run_export_pipeline, PipelineError
 
 router = APIRouter(tags=["generate"])
 
@@ -216,75 +215,3 @@ async def generate_project(slug: str, body: GenerateRequest) -> GenerateResponse
     _trigger_docs_refresh_local()
 
     return GenerateResponse(status="ok", diagrams=body.diagrams)
-
-
-# ---------------------------------------------------------------------------
-# Pipeline endpoint: export generated docs/diagrams into external Git repo
-# ---------------------------------------------------------------------------
-
-GITHUB_REPO_HTTP = "https://github.com/SevDev21/disney-ai-plus"
-REPO_ROOT_ENV_VAR = "ARCH_PIPELINE_REPO_ROOT"
-
-
-def _get_export_repo_root() -> Path:
-    """
-    Resolve the local clone of the export repo.
-
-    Set ARCH_PIPELINE_REPO_ROOT in the arch-api systemd unit, e.g.:
-
-      Environment=ARCH_PIPELINE_REPO_ROOT=/opt/disney-ai-plus
-    """
-    raw = os.environ.get(REPO_ROOT_ENV_VAR)
-    if not raw:
-        raise HTTPException(
-            status_code=500,
-            detail=(
-                f"{REPO_ROOT_ENV_VAR} is not set; configure it to point to the "
-                "local disney-ai-plus repo on the server."
-            ),
-        )
-    root = Path(raw).expanduser().resolve()
-    if not root.exists():
-        raise HTTPException(
-            status_code=500,
-            detail=f"Export repo path does not exist: {root}",
-        )
-    return root
-
-
-def _build_commit_url(commit_hash: Optional[str]) -> Optional[str]:
-    if not commit_hash:
-        return None
-    return f"{GITHUB_REPO_HTTP}/commit/{commit_hash}"
-
-
-@router.post("/api/projects/{slug}/pipeline")
-async def trigger_pipeline(slug: str):
-    """
-    Trigger the export pipeline for a project.
-
-    This calls server.services.pipeline_export.run_export_pipeline, which:
-      - updates a small per-project pipeline log (so there is always a change),
-      - stages architecture + diagram files + the log,
-      - always creates a commit (empty if needed),
-      - pushes to the configured remote.
-
-    The JSON shape is consumed by the MkDocs UI modal.
-    """
-    repo_root = _get_export_repo_root()
-
-    try:
-        result = run_export_pipeline(
-            project_slug=slug,
-            repo_root=repo_root,
-        )
-    except PipelineError as exc:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Pipeline failed: {exc}",
-        ) from exc
-
-    # Convert commit hash into a full GitHub URL
-    result["commit_url"] = _build_commit_url(result.get("commit"))
-
-    return result

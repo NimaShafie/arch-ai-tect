@@ -1,44 +1,37 @@
 # server/routers/pipeline.py
 
+from __future__ import annotations
+
 from pathlib import Path
-import os
-import subprocess
-from typing import List
+from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException
+from pydantic import BaseModel
+from sqlmodel import select
 
+from server.db import get_session
+from server.models import Setting
 from server.services.run_build_nav import (
     PROJECTS_ROOT,
     DIAGRAM_FILES,
     _read_without_leading_title,
     build_pipeline_diagram_markdown,
-    save_pipeline_png_from_body,
 )
+from server.services.github_push import push_files_to_github, GitHubPushError
 
 router = APIRouter(prefix="/api/projects", tags=["pipeline"])
 
-# Default location of the Disney+ docs repo if PIPELINE_REPO_DIR is not set
-DEFAULT_PIPELINE_REPO_DIR = "/home/n1mz/projects/disney-ai-plus"
+
+class PipelineRequest(BaseModel):
+    repo: Optional[str] = None   # "owner/repo" format
+    token: Optional[str] = None  # GitHub PAT with Contents: Write permission
 
 
-def _git(args: List[str], cwd: Path) -> str:
-    """Run a git command and return stdout, raising on failure."""
-    proc = subprocess.run(
-        ["git", *args],
-        cwd=str(cwd),
-        text=True,
-        capture_output=True,
-    )
-    if proc.returncode != 0:
-        raise RuntimeError(f"git {' '.join(args)} failed: {proc.stderr.strip()}")
-    return proc.stdout.strip()
-
-
-def _export_to_pipeline(slug: str) -> dict:
+def _build_pipeline_files(slug: str) -> dict[str, str]:
     """
-    Core export logic used by both GET and POST endpoints.
+    Build all markdown file contents in memory for the pipeline export.
+    Returns {repo_relative_path: file_content_string}.
     """
-    repo_root = Path(".").resolve()
     project_dir = PROJECTS_ROOT / slug
     if not project_dir.exists():
         raise HTTPException(status_code=404, detail="Unknown project slug")
@@ -47,19 +40,12 @@ def _export_to_pipeline(slug: str) -> dict:
     if not index_path.exists():
         raise HTTPException(
             status_code=500,
-            detail="Project index.md not found; run build_nav / docs build first.",
+            detail="Project index.md not found; generate diagrams first.",
         )
 
-    # Resolve pipeline repo directory, with a sensible default
-    pipeline_repo_dir_env = os.getenv("PIPELINE_REPO_DIR", DEFAULT_PIPELINE_REPO_DIR)
-    pipeline_repo_dir = Path(pipeline_repo_dir_env).resolve()
-    if not pipeline_repo_dir.exists():
-        raise HTTPException(
-            status_code=500,
-            detail=f"PIPELINE_REPO_DIR '{pipeline_repo_dir}' does not exist.",
-        )
+    files: dict[str, str] = {}
 
-    # --- Architecture file: slice index.md between '### Package' and '### Diagrams'
+    # --- Architecture file: extract the Package section from index.md ---
     index_text = index_path.read_text(encoding="utf-8")
     pkg_marker = "\n### Package"
     diag_marker = "\n### Diagrams"
@@ -72,64 +58,43 @@ def _export_to_pipeline(slug: str) -> dict:
             detail="Could not locate '### Package' section in project index.md",
         )
 
-    if diag_pos == -1 or diag_pos <= pkg_pos:
-        # If there is no diagrams section yet, treat rest of file as architecture.
-        arch_body = index_text[pkg_pos:].strip()
-    else:
-        arch_body = index_text[pkg_pos:diag_pos].strip()
+    arch_body = (
+        index_text[pkg_pos:diag_pos].strip()
+        if diag_pos > pkg_pos
+        else index_text[pkg_pos:].strip()
+    )
 
-    # --- CLEAN UP trailing footer from the Workbench index so we don't
-    #     get double '---' and double '_Source:' in the Disney repo.
+    # Strip trailing footer lines
     arch_lines = arch_body.splitlines()
-
-    # remove trailing blank lines
     while arch_lines and not arch_lines[-1].strip():
         arch_lines.pop()
-
-    # drop trailing '_Source: ...' line if present
     if arch_lines and arch_lines[-1].lstrip().startswith("_Source:"):
         arch_lines.pop()
-
-    # drop any trailing horizontal rules
     while arch_lines and arch_lines[-1].strip() == "---":
         arch_lines.pop()
-
     arch_body_clean = "\n".join(arch_lines).rstrip()
 
-    # Try to recover the nice project title from the index (## <Title>)
     title = slug.replace("-", " ").title()
-    m = None
     for line in index_text.splitlines():
         if line.startswith("## "):
-            m = line[3:].strip()
+            title = line[3:].strip()
             break
-    if m:
-        title = m
 
-    arch_rel_path = Path("docs") / "architecture" / f"{slug}.md"
-    arch_abs = pipeline_repo_dir / arch_rel_path
-    arch_abs.parent.mkdir(parents=True, exist_ok=True)
-
-    arch_out_lines = [
-        f"# Architecture – {title}",
+    arch_content = "\n".join([
+        f"# Architecture \u2013 {title}",
         "",
         arch_body_clean,
         "",
         "---",
         "",
-        f"_Source: generated from "
-        f"[ArchAiTect Workbench](https://workbench.shafie.org/projects/{slug}/)_",
+        f"_Source: generated from [ArchAiTect Workbench](https://workbench.shafie.org/projects/{slug}/)_",
         "",
-    ]
-    arch_abs.write_text("\n".join(arch_out_lines).rstrip() + "\n", encoding="utf-8")
+    ]).rstrip() + "\n"
 
-    diagram_rel_paths: list[str] = []
+    files[f"docs/architecture/{slug}.md"] = arch_content
 
-    # --- Diagrams: transform each PlantUML source into richer markdown
+    # --- Diagram files: one markdown file per diagram type ---
     diagrams_src_root = project_dir / "diagrams"
-    diagrams_dst_root = pipeline_repo_dir / "docs" / "diagrams" / slug
-    diagrams_dst_root.mkdir(parents=True, exist_ok=True)
-
     for section_title, filename in DIAGRAM_FILES:
         src_path = diagrams_src_root / filename
         if not src_path.exists():
@@ -139,140 +104,121 @@ def _export_to_pipeline(slug: str) -> dict:
         if not body:
             continue
 
-        # CLEAN trailing footer from the diagram source as well
         diag_lines = body.splitlines()
-
-        # remove trailing blank lines
         while diag_lines and not diag_lines[-1].strip():
             diag_lines.pop()
-
-        # drop trailing '_Source: ...' if present
         if diag_lines and diag_lines[-1].lstrip().startswith("_Source:"):
             diag_lines.pop()
-
-        # drop any trailing horizontal rules
         while diag_lines and diag_lines[-1].strip() == "---":
             diag_lines.pop()
-
         body_clean = "\n".join(diag_lines).rstrip()
         if not body_clean:
             continue
 
-        # Determine image file name and paths for this diagram
-        stem = Path(filename).stem  # e.g. "c4_component"
-        image_name = stem.replace("_", "-") + "-diagram.png"
+        rendered = build_pipeline_diagram_markdown(
+            body_clean, section_title, slug, image_rel_path=None,
+        )
+        files[f"docs/diagrams/{slug}/{filename}"] = rendered.rstrip() + "\n"
 
-        # Where the PNG lives on disk inside the Disney repo:
-        disk_image_rel = Path("docs") / "diagrams" / slug / "images" / image_name
-        disk_image_abs = pipeline_repo_dir / disk_image_rel
+    return files
 
-        # Try to fetch and save the PNG; soft-fail on errors
-        try:
-            save_pipeline_png_from_body(body_clean, disk_image_abs)
-        except Exception as exc:  # noqa: BLE001
-            print(
-                f"[pipeline] WARNING: error saving PNG for {slug}/{filename}: {exc}"
-            )
 
-        # If the PNG exists on disk, use a *relative* path from the markdown
-        # file's directory: images/<name>.png. Otherwise, fall back to the
-        # remote PlantUML PNG URL (image_rel_path=None).
-        if disk_image_abs.exists():
-            md_image_rel = Path("images") / image_name
-            rendered = build_pipeline_diagram_markdown(
-                body_clean,
-                section_title,
-                slug,
-                image_rel_path=md_image_rel,
-            )
-        else:
-            rendered = build_pipeline_diagram_markdown(
-                body_clean,
-                section_title,
-                slug,
-                image_rel_path=None,
-            )
+async def _do_pipeline(slug: str, req: PipelineRequest, session) -> dict:
+    """Core pipeline logic: resolve config, build files, push to GitHub."""
+    repo = req.repo
+    token = req.token
 
-        dst_rel = Path("docs") / "diagrams" / slug / filename
-        dst_abs = pipeline_repo_dir / dst_rel
-        dst_abs.parent.mkdir(parents=True, exist_ok=True)
-        dst_abs.write_text(rendered.rstrip() + "\n", encoding="utf-8")
+    # Fall back to stored per-project config if not provided in the request
+    if not repo or not token:
+        repo_s = session.exec(
+            select(Setting).where(Setting.key == f"project:{slug}:github_repo")
+        ).first()
+        tok_s = session.exec(
+            select(Setting).where(Setting.key == f"project:{slug}:github_token")
+        ).first()
+        if not repo:
+            repo = repo_s.value if repo_s else None
+        if not token:
+            token = tok_s.value if tok_s else None
 
-        diagram_rel_paths.append(str(dst_rel))
-
-    # --- Git commit + push --------------------------------------------------
-    try:
-        # Check whether there are content changes before staging
-        status_before = _git(["status", "--porcelain"], cwd=pipeline_repo_dir)
-        has_content_changes = bool(status_before.strip())
-
-        # Stage docs (architecture + diagrams + images)
-        _git(["add", "docs/architecture", "docs/diagrams"], cwd=pipeline_repo_dir)
-
-        # Always create a commit; allow-empty when there are no content changes
-        commit_args = ["commit"]
-        if not has_content_changes:
-            commit_args.append("--allow-empty")
-        commit_args += [
-            "-m",
-            f"Update architecture & diagrams for project '{slug}'",
-        ]
-        _git(commit_args, cwd=pipeline_repo_dir)
-
-        changed = True
-
-        # Try to push; if rejected because remote is ahead, auto pull + retry once
-        try:
-            _git(["push", "origin", "master"], cwd=pipeline_repo_dir)
-        except RuntimeError as push_exc:
-            msg = str(push_exc)
-            if "fetch first" in msg or "non-fast-forward" in msg:
-                # Bring local up to date, rebase, and retry push
-                _git(["pull", "--rebase", "origin", "master"], cwd=pipeline_repo_dir)
-                _git(["push", "origin", "master"], cwd=pipeline_repo_dir)
-            else:
-                # Different push error; surface it
-                raise
-
-        # Whether or not there were prior changes, we now have a new commit
-        commit_sha = _git(["rev-parse", "HEAD"], cwd=pipeline_repo_dir)
-    except RuntimeError as exc:
+    if not repo or not token:
         raise HTTPException(
-            status_code=500,
-            detail=f"Git operation failed: {exc}",
+            status_code=400,
+            detail=(
+                "No GitHub repository configured for this project. "
+                "Provide 'repo' (owner/repo) and 'token' in the request body."
+            ),
         )
 
-    commit_sha_short = commit_sha[:7]
-    commit_url = (
-        f"https://github.com/SevDev21/disney-ai-plus/commit/{commit_sha}"
-    )
+    if "/" not in repo:
+        raise HTTPException(
+            status_code=400,
+            detail="repo must be in 'owner/repo' format (e.g. NimaShafie/test-repo)",
+        )
+
+    # Persist config so future calls can omit repo/token
+    for key, val in [
+        (f"project:{slug}:github_repo", repo),
+        (f"project:{slug}:github_token", token),
+    ]:
+        s = session.exec(select(Setting).where(Setting.key == key)).first()
+        if s:
+            s.value = val
+        else:
+            session.add(Setting(key=key, value=val))
+    session.commit()
+
+    # Build all file contents in memory
+    files = _build_pipeline_files(slug)
+
+    # Push to GitHub via API (no local git required)
+    owner, repo_name = repo.split("/", 1)
+    try:
+        result = push_files_to_github(
+            owner=owner,
+            repo=repo_name,
+            token=token,
+            files=files,
+            message=f"Update architecture & diagrams for project '{slug}'",
+        )
+    except GitHubPushError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
     return {
         "ok": True,
         "project": slug,
-        "architecture_file": str(arch_rel_path),
-        "diagram_files": diagram_rel_paths,
-        "changed": changed,
-        "commit": commit_sha_short,
-        "commit_url": commit_url,
+        "files_pushed": result["files_pushed"],
+        "commit": result["commit_sha_short"],
+        "commit_url": result["commit_url"],
+        "repo_url": result["repo_url"],
+        "repo_tree_url": result["repo_tree_url"],
+        "branch": result["branch"],
     }
 
 
 @router.post("/{slug}/pipeline")
-async def send_to_pipeline(slug: str):
+async def send_to_pipeline(
+    slug: str,
+    req: Optional[PipelineRequest] = Body(default=None),
+    session=Depends(get_session),
+):
     """
-    Export the latest architecture + diagrams for a project into the
-    Disney+ pipeline repo and push a commit.
+    Export the latest architecture + diagrams for a project to a GitHub
+    repository via the GitHub API.
 
-    The behavior is unchanged; this POST endpoint is what the Workbench UI uses.
+    Accepts optional JSON body:
+        { "repo": "owner/repo", "token": "ghp_..." }
+
+    If omitted, falls back to the per-project stored configuration.
+    The provided repo/token are saved for future calls.
     """
-    return _export_to_pipeline(slug)
+    return await _do_pipeline(slug, req or PipelineRequest(), session)
 
 
 @router.get("/{slug}/pipeline")
-async def send_to_pipeline_get(slug: str):
+async def send_to_pipeline_get(slug: str, session=Depends(get_session)):
     """
-    GET variant of the same pipeline export, so that direct navigation to
-    /api/projects/<slug>/pipeline (or tools using GET) behaves consistently.
+    GET variant — uses stored per-project GitHub config only.
+    Useful for testing or direct browser navigation.
     """
-    return _export_to_pipeline(slug)
+    return await _do_pipeline(slug, PipelineRequest(), session)
