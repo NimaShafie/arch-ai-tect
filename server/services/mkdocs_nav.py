@@ -78,8 +78,9 @@ def _render_projects_index(projects: List[Project]) -> str:
         "# Projects\n\n"
         "These architecture projects are managed by the **ArchAiTect Workbench**.\n\n"
         "Use this page as the hub to jump into each project's package docs and diagrams.\n\n"
-        "## Jump to a project\n\n"
+        "<div id=\"wb-projects\">\n\n"
         f"{jump_list}\n\n"
+        "</div>\n\n"
         "---\n\n"
         f"{sections_block}\n"
     )

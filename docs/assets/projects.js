@@ -85,7 +85,7 @@
         p.slug ||
         "Unnamed project";
       a.textContent = name;
-      a.href = "../projects/" + encodeURIComponent(p.slug) + "/";
+      a.href = "/projects/" + encodeURIComponent(p.slug) + "/";
       li.appendChild(a);
       ul.appendChild(li);
     }

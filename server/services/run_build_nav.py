@@ -801,134 +801,163 @@ def build_project_indexes() -> None:
             lines.append("---")
             lines.append("")
 
-        # Send to Pipeline button (opens repo-config modal)
-        lines.append(
-            f'<button type="button" '
-            f'onclick="awSendToPipeline(\'{slug}\')" '
-            'style="padding:8px 18px; border-radius:6px; border:none; '
-            'background:#1a73e8; color:#fff; cursor:pointer; '
-            'font-size:0.9rem; font-weight:600; margin-top:24px;">'
-            "Send to Pipeline"
-            "</button>"
-        )
-        lines.append("")
+        # Inline Push to Repository form
+        push_html = (
+            '<div style="margin-top:28px; padding:24px 28px;'
+            ' border:1px solid #e2e8f0; border-radius:10px; background:#f8fafc;">'
+            '<h3 style="margin:0 0 6px; font-size:1.05rem; font-weight:700; color:#0f172a;">'
+            '4. Push to Repository</h3>'
+            '<p style="margin:0 0 18px; font-size:0.875rem; color:#64748b;">'
+            'Push generated docs &amp; diagrams directly to a GitHub repository.</p>'
 
-        # Modal with repo + token inputs
-        lines.append(
-            f'<div id="aw-pipeline-modal-{slug}" '
-            'style="display:none; position:fixed; inset:0; '
-            'background:rgba(0,0,0,0.45); z-index:9999;">'
-            '<div style="background:#fff; border-radius:10px; '
-            'padding:24px 28px; width:100%; max-width:500px; '
-            'margin:8% auto; box-shadow:0 8px 32px rgba(0,0,0,0.22);">'
-            '<div style="font-size:1.1rem; font-weight:700; '
-            'margin-bottom:16px;">Send to GitHub Pipeline</div>'
-
-            '<label style="display:block; font-size:0.85rem; '
-            'color:#555; margin-bottom:4px;">'
-            'GitHub Repository (owner/repo)</label>'
-            f'<input id="aw-gh-repo-{slug}" type="text" '
-            'placeholder="e.g. NimaShafie/test-repo" '
-            'style="width:100%; box-sizing:border-box; padding:8px 10px; '
-            'border:1px solid #ccc; border-radius:6px; font-size:0.9rem; '
-            'margin-bottom:14px;" />'
-
-            '<label style="display:block; font-size:0.85rem; '
-            'color:#555; margin-bottom:4px;">'
-            'GitHub Personal Access Token</label>'
-            f'<input id="aw-gh-token-{slug}" type="password" '
-            'placeholder="ghp_... (requires Contents: Write)" '
-            'style="width:100%; box-sizing:border-box; padding:8px 10px; '
-            'border:1px solid #ccc; border-radius:6px; font-size:0.9rem; '
-            'margin-bottom:14px;" />'
-
-            f'<div id="aw-pipeline-status-{slug}" '
-            'style="font-size:0.88rem; min-height:20px; '
-            'margin-bottom:14px;"></div>'
-
-            '<div style="display:flex; justify-content:flex-end; gap:10px;">'
-            f'<button type="button" onclick="awClosePipeline(\'{slug}\')" '
-            'style="padding:8px 16px; border-radius:6px; '
-            'border:1px solid #ccc; background:#f5f5f5; '
-            'cursor:pointer; font-size:0.9rem;">Cancel</button>'
-            f'<button id="aw-pipeline-submit-{slug}" type="button" '
-            f'onclick="awSubmitPipeline(\'{slug}\')" '
-            'style="padding:8px 18px; border-radius:6px; border:none; '
-            'background:#1a73e8; color:#fff; cursor:pointer; '
-            'font-size:0.9rem; font-weight:600;">Push to GitHub</button>'
+            '<div style="margin-bottom:12px;">'
+            '<label style="display:block; font-size:0.8rem; font-weight:600;'
+            ' color:#64748b; text-transform:uppercase; letter-spacing:.3px;'
+            ' margin-bottom:5px;">GitHub Repository</label>'
+            f'<input id="aw-push-repo-{slug}" type="text"'
+            ' placeholder="owner/repo  or  https://github.com/owner/repo"'
+            ' style="width:100%; box-sizing:border-box; padding:9px 12px;'
+            ' border:1px solid #cbd5e1; border-radius:8px;'
+            ' background:#fff; color:#0f172a; font-size:.9rem;" />'
+            '<div style="font-size:.75rem; color:#64748b; margin-top:3px;">'
+            'Fine-grained or classic PAT requires'
+            ' <strong>Contents: Read &amp; Write</strong> permission.</div>'
             '</div>'
-            '</div></div>'
+
+            '<div style="margin-bottom:12px;">'
+            '<label style="display:block; font-size:0.8rem; font-weight:600;'
+            ' color:#64748b; text-transform:uppercase; letter-spacing:.3px;'
+            ' margin-bottom:5px;">Personal Access Token (PAT)</label>'
+            f'<input id="aw-push-token-{slug}" type="password" placeholder="ghp_\u2026"'
+            ' style="width:100%; box-sizing:border-box; padding:9px 12px;'
+            ' border:1px solid #cbd5e1; border-radius:8px;'
+            ' background:#fff; color:#0f172a; font-size:.9rem;" />'
+            '<div style="font-size:.75rem; color:#64748b; margin-top:3px;">'
+            'Token is stored server-side per project and never sent back to the browser.</div>'
+            '</div>'
+
+            '<div style="margin-bottom:16px;">'
+            '<label style="display:block; font-size:0.8rem; font-weight:600;'
+            ' color:#64748b; text-transform:uppercase; letter-spacing:.3px;'
+            ' margin-bottom:5px;">Target Folder'
+            ' <span style="font-weight:400;text-transform:none;">(inside repo)</span></label>'
+            f'<input id="aw-push-folder-{slug}" type="text" placeholder="{slug}"'
+            ' style="width:100%; box-sizing:border-box; padding:9px 12px;'
+            ' border:1px solid #cbd5e1; border-radius:8px;'
+            ' background:#fff; color:#0f172a; font-size:.9rem;" />'
+            '</div>'
+
+            f'<button type="button" id="aw-push-btn-{slug}"'
+            f' onclick="awPushToGitHub(\'{slug}\')"'
+            ' style="padding:10px 20px; border-radius:8px; border:none;'
+            ' background:#1a73e8; color:#fff; cursor:pointer;'
+            ' font-size:0.9rem; font-weight:600;">Push to GitHub</button>'
+
+            f'<div id="aw-push-status-{slug}"'
+            ' style="display:none; margin-top:12px; padding:10px 14px;'
+            ' border-radius:8px; font:13px/1.6 ui-monospace,SFMono-Regular,'
+            'Menlo,Consolas,monospace; white-space:pre-wrap; word-break:break-word;"></div>'
+            '</div>'
         )
+        lines.append(push_html)
         lines.append("")
 
-        js = """
+        js_slug = slug
+        js = f"""
 <script>
-function awSendToPipeline(slug) {
-  var modal = document.getElementById('aw-pipeline-modal-' + slug);
-  if (!modal) return;
-  var repoInput = document.getElementById('aw-gh-repo-' + slug);
-  var tokenInput = document.getElementById('aw-gh-token-' + slug);
-  var statusEl = document.getElementById('aw-pipeline-status-' + slug);
-  if (repoInput) repoInput.value = localStorage.getItem('aw-gh-repo-' + slug) || '';
-  if (tokenInput) tokenInput.value = '';
-  if (statusEl) statusEl.innerHTML = '';
-  modal.style.display = 'block';
-}
-function awClosePipeline(slug) {
-  var modal = document.getElementById('aw-pipeline-modal-' + slug);
-  if (modal) modal.style.display = 'none';
-}
-async function awSubmitPipeline(slug) {
-  var repoInput = document.getElementById('aw-gh-repo-' + slug);
-  var tokenInput = document.getElementById('aw-gh-token-' + slug);
-  var statusEl = document.getElementById('aw-pipeline-status-' + slug);
-  var submitBtn = document.getElementById('aw-pipeline-submit-' + slug);
-  if (!repoInput || !tokenInput || !statusEl || !submitBtn) return;
-  var repo = repoInput.value.trim();
-  var token = tokenInput.value.trim();
-  if (!repo || !token) {
-    statusEl.innerHTML = '<span style="color:#b00020;">Please fill in both fields.</span>';
+(async function() {{
+  var slug = '{js_slug}';
+  try {{
+    var r = await fetch('https://workbench.shafie.org/api/projects/' + slug + '/pipeline/config',
+      {{credentials: 'include'}});
+    if (r.ok) {{
+      var cfg = await r.json();
+      var repoEl   = document.getElementById('aw-push-repo-'   + slug);
+      var folderEl = document.getElementById('aw-push-folder-' + slug);
+      var tokenEl  = document.getElementById('aw-push-token-'  + slug);
+      if (repoEl   && cfg.repo)        repoEl.value          = cfg.repo;
+      if (folderEl && cfg.folder)      folderEl.value        = cfg.folder;
+      if (tokenEl  && cfg.token_saved) tokenEl.placeholder   = '\\u2022\\u2022\\u2022\\u2022\\u2022\\u2022\\u2022\\u2022  (saved \\u2014 leave blank to keep)';
+    }}
+  }} catch(e) {{}}
+}})();
+
+async function awPushToGitHub(slug) {{
+  var btn      = document.getElementById('aw-push-btn-'    + slug);
+  var statusEl = document.getElementById('aw-push-status-' + slug);
+  var repoEl   = document.getElementById('aw-push-repo-'   + slug);
+  var tokenEl  = document.getElementById('aw-push-token-'  + slug);
+  var folderEl = document.getElementById('aw-push-folder-' + slug);
+
+  var repo   = repoEl   ? repoEl.value.trim()   : '';
+  var token  = tokenEl  ? tokenEl.value.trim()  : '';
+  var folder = folderEl ? folderEl.value.trim() : '';
+
+  if (!repo) {{
+    awPushStatus(statusEl, '\\u26a0 Enter a GitHub repository (owner/repo or URL).', 'warn');
     return;
-  }
-  if (repo.indexOf('/') === -1) {
-    statusEl.innerHTML = '<span style="color:#b00020;">Repository must be in owner/repo format (e.g. NimaShafie/test-repo).</span>';
-    return;
-  }
-  localStorage.setItem('aw-gh-repo-' + slug, repo);
-  submitBtn.disabled = true;
-  statusEl.innerHTML = '<span style="color:#555;">Pushing to GitHub\u2026</span>';
-  try {
-    var resp = await fetch('https://workbench.shafie.org/api/projects/' + slug + '/pipeline', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      credentials: 'include',
-      body: JSON.stringify({repo: repo, token: token})
-    });
+  }}
+
+  var body = {{repo: repo}};
+  if (token)  body.token         = token;
+  if (folder) body.target_folder = folder;
+
+  if (btn) btn.disabled = true;
+  awPushStatus(statusEl, '\\u23f3 Pushing files to GitHub\\u2026', 'loading');
+
+  try {{
+    var resp = await fetch(
+      'https://workbench.shafie.org/api/projects/' + slug + '/pipeline',
+      {{
+        method:  'POST',
+        headers: {{'Content-Type': 'application/json'}},
+        credentials: 'include',
+        body:    JSON.stringify(body)
+      }}
+    );
     var data = null;
-    try { data = await resp.json(); } catch(e) {}
-    if (!resp.ok) {
+    try {{ data = await resp.json(); }} catch(e) {{}}
+    if (!resp.ok) {{
       var detail = (data && data.detail) ? data.detail : ('HTTP ' + resp.status);
-      statusEl.innerHTML = '<span style="color:#b00020;font-weight:600;">Push failed: ' + detail + '</span>';
+      awPushStatus(statusEl, '\\u2717 Push failed: ' + detail, 'error');
       return;
-    }
-    var commitUrl = data.commit_url || '#';
-    var commitShort = data.commit || '';
-    var repoUrl = data.repo_url || ('https://github.com/' + repo);
-    var fileCount = (data.files_pushed || []).length;
-    statusEl.innerHTML =
-      '<span style="color:#065f46;font-weight:600;">\u2713 Successfully pushed to GitHub!</span>' +
-      '<br/><strong>Commit:</strong> <a href="' + commitUrl + '" target="_blank" rel="noopener">' + commitShort + '</a>' +
-      '<br/><strong>Repository:</strong> <a href="' + repoUrl + '" target="_blank" rel="noopener">' + repo + '</a>' +
-      '<br/><strong>Files pushed:</strong> ' + fileCount;
-  } catch(err) {
-    statusEl.innerHTML = '<span style="color:#b00020;">Network error: ' + err.message + '</span>';
-  } finally {
-    submitBtn.disabled = false;
-  }
-}
+    }}
+    var n      = data.files_pushed ? data.files_pushed.length : '?';
+    var commit = data.commit || '';
+    var url    = data.repo_tree_url || data.repo_url || '';
+    var msg    = '\\u2713 Pushed ' + n + ' file' + (n !== 1 ? 's' : '') +
+                 ' to ' + (data.target_folder || folder) + '/';
+    if (commit) msg += '\\n  commit ' + commit;
+    if (url)    msg += '\\n  ' + url;
+    awPushStatus(statusEl, msg, 'success');
+    if (url) {{
+      statusEl.style.cursor = 'pointer';
+      statusEl.onclick = function() {{ window.open(url, '_blank'); }};
+    }}
+  }} catch(err) {{
+    awPushStatus(statusEl, '\\u2717 Network error: ' + err.message, 'error');
+  }} finally {{
+    if (btn) btn.disabled = false;
+  }}
+}}
+
+function awPushStatus(el, msg, state) {{
+  if (!el) return;
+  el.textContent    = msg;
+  el.style.display  = 'block';
+  if (state === 'success') {{
+    el.style.background = '#052e16'; el.style.color = '#86efac';
+    el.style.border = '1px solid #16a34a';
+  }} else if (state === 'error') {{
+    el.style.background = '#2d0a0a'; el.style.color = '#fca5a5';
+    el.style.border = '1px solid #dc2626';
+  }} else {{
+    el.style.background = '#0c1a33'; el.style.color = '#93c5fd';
+    el.style.border = '1px solid #3b82f6';
+  }}
+}}
 </script>
 """.strip()
-
         lines.append(js)
         lines.append("")
 

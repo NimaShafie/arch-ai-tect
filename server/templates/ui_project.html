@@ -3,54 +3,58 @@
 {% block title %}{{ project.name }} · Workbench{% endblock %}
 {% block content %}
 <div class="shell" style="padding-bottom:60px;">
-  <!-- Lightweight spinner + toast styles (no layout changes) -->
   <style>
+    /* Spinner on busy buttons */
     .btn-busy {
       position: relative;
       pointer-events: none;
-      opacity: 0.8;
-      /* extra padding so the spinner never collides with the label text */
-      padding-right: 30px !important;
+      opacity: 0.82;
+      padding-right: 34px !important;
     }
     .btn-busy::after {
       content: "";
       position: absolute;
-      right: 10px;
+      right: 11px;
       width: 14px;
       height: 14px;
-      border-radius: 999px;
-      border: 2px solid rgba(255,255,255,0.45);
-      border-top-color: #ffffff;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: #fff;
       animation: ui-spin 0.6s linear infinite;
     }
-    @keyframes ui-spin {
-      to { transform: rotate(360deg); }
-    }
-    #toastRoot {
-      position: fixed;
-      top: 16px;
-      right: 16px;
-      z-index: 9999;
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 8px;
-    }
-    .toast {
-      background: #111827;
-      color: #f9fafb;
-      padding: 8px 12px;
+    @keyframes ui-spin { to { transform: rotate(360deg); } }
+
+    /* Terminal-style code block for status messages under each action button */
+    .status-block {
+      display: none;
+      margin-top: 10px;
+      padding: 10px 14px;
       border-radius: 8px;
-      box-shadow: 0 10px 30px rgba(0,0,0,.25);
-      font-size: 13px;
-      max-width: 280px;
-      transition: opacity 0.25s ease, transform 0.25s ease;
+      border: 1px solid #334155;
+      background: #0f172a;
+      color: #94a3b8;
+      font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      white-space: pre-wrap;
+      word-break: break-word;
     }
-    .toast-success { background: #065f46; }
-    .toast-error { background: #991b1b; }
+    .status-block::before { content: "$ "; opacity: 0.40; }
+    .status-block.visible { display: block; }
+    .status-block.loading {
+      background: #0c1a33;
+      border-color: #3b82f6;
+      color: #93c5fd;
+    }
+    .status-block.success {
+      background: #052e16;
+      border-color: #16a34a;
+      color: #86efac;
+    }
+    .status-block.error {
+      background: #2d0a0a;
+      border-color: #dc2626;
+      color: #fca5a5;
+    }
   </style>
-  <!-- Toast container -->
-  <div id="toastRoot"></div>
   <!-- Header -->
   <div style="margin-bottom:20px;">
     <h1 class="h1" style="margin-bottom:4px;">{{ project.name }}</h1>
@@ -122,7 +126,7 @@
             Interpret with AI
           </button>
         </div>
-        <p id="interpretStatus" class="muted" style="margin-top:10px; min-height:18px;"></p>
+        <div id="interpretStatus" class="status-block"></div>
         <h3 style="margin-top:22px; margin-bottom:8px; font-size:1rem; font-weight:600;">
           Generated Brief (edit if needed)
         </h3>
@@ -134,12 +138,13 @@
         <div style="margin-top:14px;">
           <button
             id="saveBriefBtn"
-            class="btn"
-            style="display:inline-flex; align-items:center; justify-content:center; padding:9px 16px;"
+            class="btn primary"
+            style="display:inline-flex; align-items:center; justify-content:center; padding:10px 18px;"
           >
             Save Brief
           </button>
         </div>
+        <div id="saveStatus" class="status-block"></div>
       </div>
     </section>
     <!-- RIGHT COLUMN: GENERATE + VIEW OUTPUT -->
@@ -249,7 +254,7 @@
                 Generate Diagrams
               </button>
             </div>
-            <p id="genStatus" class="muted" style="margin-top:10px; min-height:18px;"></p>
+            <div id="genStatus" class="status-block"></div>
           </form>
         </div>
       </section>
@@ -263,39 +268,112 @@
           <a
             href="https://docs.shafie.org/projects/{{ project.slug }}/"
             target="_blank"
-            class="btn"
-            style="display:inline-flex; align-items:center; justify-content:center; padding:9px 18px;"
+            class="btn primary"
+            style="display:inline-flex; align-items:center; justify-content:center; padding:10px 18px;"
           >
             View Documentation
           </a>
+        </div>
+      </section>
+
+      <!-- Push to Repository ─────────────────────────────────────────── -->
+      <section class="card" id="pushCard">
+        <style>
+          /* Config fields grid */
+          #pushFields { margin-top:16px; }
+          #pushFields.open { display:block; }
+          .push-field { display:flex; flex-direction:column; gap:5px; margin-bottom:12px; }
+          .push-field label { font-size:.8rem; font-weight:600; color:var(--muted); letter-spacing:.3px; text-transform:uppercase; }
+          .push-field input {
+            width:100%; padding:9px 12px;
+            border:1px solid var(--border); border-radius:8px;
+            background:#fff; color:#0f172a; font-size:.9rem;
+          }
+          .push-field input:focus { outline:none; box-shadow:0 0 0 3px var(--ring); border-color:transparent; }
+          .push-field .hint { font-size:.75rem; color:var(--muted); margin-top:2px; }
+
+          /* Folder path preview badge */
+          #folderPreview {
+            display:inline-block; margin-top:2px; padding:2px 8px;
+            background:#f1f5f9; border-radius:4px;
+            font:.75rem/1.4 ui-monospace,monospace; color:#475569;
+          }
+        </style>
+        <div style="padding:24px 28px;">
+          <h2 class="h1" style="margin-bottom:4px;">4. Push to Repository</h2>
+          <p class="muted" style="margin-bottom:0; font-size:.875rem;">
+            Push generated docs &amp; diagrams directly to a GitHub repository.
+          </p>
+
+          <div id="pushFields" style="display:block;">
+            <div class="push-field" style="margin-top:4px;">
+              <label for="pushRepo">GitHub Repository</label>
+              <input
+                id="pushRepo"
+                type="text"
+                placeholder="owner/repo  or  https://github.com/owner/repo"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <span class="hint">Fine-grained or classic PAT requires <strong>Contents: Read &amp; Write</strong> permission.</span>
+            </div>
+
+            <div class="push-field">
+              <label for="pushToken">Personal Access Token (PAT)</label>
+              <input
+                id="pushToken"
+                type="password"
+                placeholder="ghp_…"
+                autocomplete="new-password"
+                spellcheck="false"
+              />
+              <span class="hint">Token is stored server-side per project and never sent back to the browser.</span>
+            </div>
+
+            <div class="push-field">
+              <label for="pushFolder">Target Folder <span style="font-weight:400;text-transform:none;">(inside repo)</span></label>
+              <input
+                id="pushFolder"
+                type="text"
+                placeholder="{{ project.slug }}"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <span class="hint">
+                All files are placed under this folder.
+                Preview: <code id="folderPreview">{{ project.slug }}/</code>
+              </span>
+            </div>
+
+            <div style="margin-top:4px;">
+              <button
+                id="pushBtn"
+                class="btn primary"
+                style="display:inline-flex; align-items:center; justify-content:center; padding:10px 18px;"
+              >
+                Push to GitHub
+              </button>
+            </div>
+            <div id="pushStatus" class="status-block"></div>
+          </div>
         </div>
       </section>
     </div>
   </div>
 </div>
 <script>
-// Toast helper
-const toastRoot = document.querySelector("#toastRoot");
-function showToast(message, type) {
-  if (!toastRoot) return;
-  const el = document.createElement("div");
-  el.className = "toast" + (type === "error" ? " toast-error" :
-                            type === "success" ? " toast-success" : "");
-  el.textContent = message;
-  toastRoot.appendChild(el);
-  // animate out
-  requestAnimationFrame(() => {
-    el.style.opacity = "1";
-    el.style.transform = "translateY(0)";
-  });
-  setTimeout(() => {
-    el.style.opacity = "0";
-    el.style.transform = "translateY(-4px)";
-  }, 3000);
-  setTimeout(() => el.remove(), 3400);
+// ── Status block helper ────────────────────────────────────────────────────
+// Sets the text, state class (loading/success/error/''), and shows/hides the block.
+function setStatus(el, text, state) {
+  el.textContent = text;
+  el.classList.remove("loading", "success", "error");
+  if (state) el.classList.add(state);
+  el.classList.toggle("visible", text.length > 0);
 }
+
 // track whether we've successfully saved at least once
 let hasSavedBrief = false;
+
 // Load existing brief.json into the editor on page load
 (async () => {
   try {
@@ -311,17 +389,21 @@ let hasSavedBrief = false;
     console.error("Failed to load brief:", err);
   }
 })();
-// Interpret Requirements with AI
+
+// ── Interpret with AI ──────────────────────────────────────────────────────
 document.querySelector("#interpretBtn").addEventListener("click", async () => {
-  const btn = document.querySelector("#interpretBtn");
+  const btn    = document.querySelector("#interpretBtn");
   const prompt = document.querySelector("#briefPrompt").value.trim();
   const status = document.querySelector("#interpretStatus");
+
   if (!prompt) {
-    status.textContent = "Enter a prompt first.";
+    setStatus(status, "⚠ Enter a description first.", "error");
     return;
   }
-  status.textContent = "Interpreting with AI…";
+
+  setStatus(status, "⏳ Interpreting with AI — this may take ~20 seconds…", "loading");
   btn.classList.add("btn-busy");
+
   try {
     const r = await fetch("/api/projects/{{ project.slug }}/brief/interpret", {
       method: "POST",
@@ -339,144 +421,196 @@ document.querySelector("#interpretBtn").addEventListener("click", async () => {
       detail = data.detail || "";
     } else {
       const text = await r.text().catch(() => "");
-      detail = text ? text.slice(0, 140) + (text.length > 140 ? "…" : "") : "";
+      detail = text ? text.slice(0, 200) + (text.length > 200 ? "…" : "") : "";
     }
     if (!r.ok) {
-      let hint = "";
-      if (r.status >= 500) {
-        hint = " The AI backend returned a server error. Check the API logs and your OpenWebUI / Cloudflare setup.";
-      }
       throw new Error(
-        `HTTP ${r.status}. ${detail || ""}${hint}`.trim()
+        `HTTP ${r.status}. ${detail || "The AI backend returned a server error."}`.trim()
       );
     }
-    status.textContent = "AI interpretation complete.";
+    setStatus(status, "✓ AI interpretation complete. Review the brief below, then click Save Brief.", "success");
   } catch (err) {
     console.error(err);
-    status.textContent = "Error calling AI: " + err.message;
+    setStatus(status, "✗ Error calling AI: " + err.message, "error");
   } finally {
     btn.classList.remove("btn-busy");
   }
 });
-// Save brief.json (with button text change)
+
+// ── Save Brief ─────────────────────────────────────────────────────────────
 document.querySelector("#saveBriefBtn").addEventListener("click", async () => {
-  const btn = document.querySelector("#saveBriefBtn");
-  const text = document.querySelector("#briefJson").value;
-  const trimmed = text.trim();
-  if (!trimmed) {
-    showToast("Nothing to save yet. Use 'Interpret with AI' first or paste a brief JSON.", "error");
+  const btn    = document.querySelector("#saveBriefBtn");
+  const status = document.querySelector("#saveStatus");
+  const text   = document.querySelector("#briefJson").value.trim();
+
+  if (!text) {
+    setStatus(status, "⚠ Nothing to save yet. Use 'Interpret with AI' first or paste a brief JSON.", "error");
     return;
   }
   let parsed;
   try {
-    parsed = JSON.parse(trimmed);
+    parsed = JSON.parse(text);
   } catch (e) {
-    showToast("The Generated Brief is not valid JSON. Fix it or re-run 'Interpret with AI'.", "error");
-    console.error(e);
+    setStatus(status, "✗ The brief is not valid JSON. Fix it or re-run 'Interpret with AI'.\n" + e.message, "error");
     return;
   }
-  
-  // Store original text and change button text
-  const originalText = btn.textContent;
-  btn.textContent = "Saving...";
+
+  setStatus(status, "⏳ Saving…", "loading");
   btn.classList.add("btn-busy");
-  
+
   try {
     const r = await fetch("/api/projects/{{ project.slug }}/brief", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ brief: parsed })
     });
-    if (!r.ok) throw new Error(`Failed to save brief (HTTP ${r.status}).`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}.`);
     hasSavedBrief = true;
-    showToast("Brief saved.", "success");
+    setStatus(status, "✓ Brief saved. You can now generate diagrams.", "success");
   } catch (err) {
     console.error(err);
-    showToast("Save failed: " + err.message, "error");
+    setStatus(status, "✗ Save failed: " + err.message, "error");
   } finally {
     btn.classList.remove("btn-busy");
-    btn.textContent = originalText;
   }
 });
-// Generate diagrams (with button text change)
+
+// ── Generate Diagrams ──────────────────────────────────────────────────────
 document.querySelector("#generateBtn").addEventListener("click", async (e) => {
   e.preventDefault();
-  const btn = document.querySelector("#generateBtn");
+  const btn    = document.querySelector("#generateBtn");
   const status = document.querySelector("#genStatus");
-  status.textContent = "";
+
   const briefText = document.querySelector("#briefJson").value.trim();
   if (!briefText) {
-    status.textContent =
-      "To generate diagrams, first use '1. Requirements Brief' → 'Interpret with AI', then review and save the Generated Brief.";
+    setStatus(status, "⚠ Interpret and save a brief first before generating diagrams.", "error");
     return;
   }
-  let parsedBrief;
-  try {
-    parsedBrief = JSON.parse(briefText);
-  } catch (err) {
-    status.textContent =
-      "The Generated Brief is not valid JSON. Fix it or click 'Interpret with AI' again before generating diagrams.";
+  try { JSON.parse(briefText); }
+  catch (err) {
+    setStatus(status, "✗ Brief JSON is invalid. Re-run 'Interpret with AI' or fix the JSON.\n" + err.message, "error");
     return;
   }
+
   const form = document.querySelector("#diagramForm");
   const choices = Array.from(
     form.querySelectorAll("input[name='choices']:checked")
   ).map(c => c.value);
   if (choices.length === 0) {
-    status.textContent = "Select at least one diagram type before generating.";
+    setStatus(status, "⚠ Select at least one diagram type.", "error");
     return;
   }
-  // Require that the brief has been saved at least once to avoid
-  // backend "brief.json not found" errors.
   if (!hasSavedBrief) {
-    status.textContent =
-      "Please click 'Save Brief' first. This writes brief.json for this project so generation can use it.";
+    setStatus(status, "⚠ Click 'Save Brief' first — the backend needs brief.json before it can generate.", "error");
     return;
   }
-  
-  // Store original text and change button text
-  const originalText = btn.textContent;
-  btn.textContent = "Generating...";
+
+  setStatus(status, "⏳ Generating diagrams and docs…", "loading");
   btn.classList.add("btn-busy");
-  status.textContent = "Generating diagrams…";
-  
+
   try {
     const r = await fetch("/api/projects/{{ project.slug }}/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ diagrams: choices })
     });
-    const contentType = r.headers.get("content-type") || "";
-    let detail = "";
-    if (contentType.includes("application/json")) {
-      const data = await r.json().catch(() => ({}));
-      detail = data.detail || "";
-      if (!r.ok) {
-        throw new Error(
-          `HTTP ${r.status} ${r.statusText || ""}. ${detail}`.trim()
-        );
+    if (!r.ok) {
+      const contentType = r.headers.get("content-type") || "";
+      let detail = "";
+      if (contentType.includes("application/json")) {
+        const data = await r.json().catch(() => ({}));
+        detail = data.detail || "";
+      } else {
+        const txt = await r.text().catch(() => "");
+        detail = txt.slice(0, 200);
       }
-    } else {
-      const text = await r.text().catch(() => "");
-      detail = text ? text.slice(0, 140) + (text.length > 140 ? "…" : "") : "";
-      if (!r.ok) {
-        throw new Error(
-          `Diagram generation failed (HTTP ${r.status} ${r.statusText || ""}). ` +
-          "The server returned a non-JSON response (likely an HTML error page). " +
-          "Check that the backend generation endpoint is reachable."
-        );
-      }
+      throw new Error(`HTTP ${r.status}. ${detail}`.trim());
     }
-    status.textContent = "Generation complete. Use 'View Documentation' to see the results.";
-    showToast("Diagrams generated. Check the docs site.", "success");
+    setStatus(status, "✓ Generation complete. Click 'View Documentation' to see results.", "success");
   } catch (err) {
     console.error(err);
-    status.textContent = "Error during generation: " + err.message;
-    showToast("Generation failed: " + err.message, "error");
+    setStatus(status, "✗ Generation failed: " + err.message, "error");
   } finally {
     btn.classList.remove("btn-busy");
-    btn.textContent = originalText;
   }
+});
+
+// ── Push to Repository ────────────────────────────────────────────────────
+(async () => {
+  // Pre-fill saved config (repo + folder; token presence flag only)
+  try {
+    const r = await fetch("/api/projects/{{ project.slug }}/pipeline/config");
+    if (r.ok) {
+      const cfg = await r.json();
+      if (cfg.repo)   document.querySelector("#pushRepo").value   = cfg.repo;
+      if (cfg.folder) document.querySelector("#pushFolder").value = cfg.folder;
+      if (cfg.folder) updateFolderPreview(cfg.folder);
+      if (cfg.token_saved) {
+        document.querySelector("#pushToken").placeholder = "••••••••  (saved — leave blank to keep)";
+      }
+    }
+  } catch (_) {}
+})();
+
+function updateFolderPreview(val) {
+  const slug = "{{ project.slug }}";
+  const folder = (val || slug).trim().replace(/^\/+|\/+$/g, "") || slug;
+  document.querySelector("#folderPreview").textContent = folder + "/";
+}
+
+document.querySelector("#pushFolder").addEventListener("input", e => {
+  updateFolderPreview(e.target.value);
+});
+
+document.querySelector("#pushBtn").addEventListener("click", async () => {
+  const btn    = document.querySelector("#pushBtn");
+  const status = document.querySelector("#pushStatus");
+
+  const repo   = document.querySelector("#pushRepo").value.trim();
+  const token  = document.querySelector("#pushToken").value.trim();
+  const folder = document.querySelector("#pushFolder").value.trim();
+
+  if (!repo) {
+    setStatus(status, "⚠ Enter a GitHub repository (owner/repo or URL).", "error");
+    return;
+  }
+
+  const body = { repo };
+  if (token)  body.token         = token;
+  if (folder) body.target_folder = folder;
+
+  setStatus(status, "⏳ Pushing files to GitHub…", "loading");
+  btn.classList.add("btn-busy");
+
+  try {
+    const r = await fetch("/api/projects/{{ project.slug }}/pipeline", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      throw new Error(data.detail || `HTTP ${r.status}`);
+    }
+    const n      = data.files_pushed ? data.files_pushed.length : "?";
+    const commit = data.commit || "";
+    const url    = data.repo_tree_url || data.repo_url || "";
+    let msg = `✓ Pushed ${n} file${n !== 1 ? "s" : ""} to ${data.target_folder || folder}/`;
+    if (commit) msg += `\n  commit ${commit}`;
+    if (url)    msg += `\n  ${url}`;
+    setStatus(status, msg, "success");
+    // Make the status clickable to open the folder
+    if (url) {
+      status.style.cursor = "pointer";
+      status.onclick = () => window.open(url, "_blank");
+    }
+  } catch (err) {
+    console.error(err);
+    setStatus(status, "✗ Push failed: " + err.message, "error");
+  } finally {
+    btn.classList.remove("btn-busy");
+  }
+});
 });
 </script>
 {% endblock %}
