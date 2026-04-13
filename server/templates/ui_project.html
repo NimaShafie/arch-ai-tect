@@ -2,7 +2,7 @@
 {% extends "base.html" %}
 {% block title %}{{ project.name }} · Workbench{% endblock %}
 {% block content %}
-<div class="shell" style="padding-bottom:60px;">
+<div class="shell">
   <style>
     /* Spinner on busy buttons */
     .btn-busy {
@@ -98,12 +98,12 @@
       </ol>
     </div>
   </section>
-  <!-- Two-column layout: left = brief, right = generate + view -->
-  <div style="display:flex; gap:24px; align-items:stretch;">
-    <!-- LEFT COLUMN: REQUIREMENTS BRIEF + GENERATE ARCHITECTURE -->
-    <div style="flex:1.35; display:flex; flex-direction:column; gap:24px;">
+  <!-- Two-column layout: left = brief only, right = generate + view + push -->
+  <div style="display:flex; gap:24px; align-items:flex-start;">
+    <!-- LEFT COLUMN: REQUIREMENTS BRIEF -->
+    <div style="flex:1.3; display:flex; flex-direction:column; gap:24px;">
     <section class="card">
-      <div style="padding:24px 28px; height:100%; box-sizing:border-box;">
+      <div style="padding:24px 28px; box-sizing:border-box;">
         <h2 class="h1" style="margin-bottom:10px;">1. Requirements Brief</h2>
         <p class="muted" style="margin-bottom:16px;">
           Describe your system, key users, major flows, constraints, expectations, and tech preferences.
@@ -148,6 +148,10 @@
         <div id="saveStatus" class="status-block"></div>
       </div>
     </section>
+    </div><!-- end left column -->
+    <!-- RIGHT COLUMN: GENERATE ARCHITECTURE + VIEW OUTPUT + PUSH TO REPOSITORY -->
+    <div style="flex:1; display:flex; flex-direction:column; gap:24px;">
+
     <!-- 2. Generate Architecture -->
     <section class="card" id="choices">
       <div class="bd" style="padding:24px 28px; box-sizing:border-box; display:flex; flex-direction:column;">
@@ -251,11 +255,8 @@
         </form>
       </div>
     </section>
-    </div><!-- end left column -->
-    <!-- RIGHT COLUMN: VIEW OUTPUT + PUSH TO REPOSITORY -->
-    <div style="flex:1; display:flex; flex-direction:column; gap:24px;">
 
-      <!-- View Output (directly under Generate Architecture) -->
+      <!-- View Output -->
       <section class="card">
         <div style="padding:24px 28px;">
           <h2 class="h1" style="margin-bottom:10px;">3. View Output</h2>

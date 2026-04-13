@@ -143,6 +143,28 @@
     @media (max-width:980px){
       .grid{ grid-template-columns:1fr }
     }
+
+    /* ── Sticky footer layout ───────────────────────────────────────── */
+    body{
+      display:flex; flex-direction:column; min-height:100vh;
+    }
+    .container{
+      flex:1;
+    }
+    .site-footer{
+      margin-top:auto;
+      border-top:1px solid var(--border);
+      background:var(--card);
+      padding:18px 24px;
+    }
+    .site-footer .footer-inner{
+      max-width:1200px; margin:0 auto;
+      display:flex; align-items:center; justify-content:space-between;
+      flex-wrap:wrap; gap:8px;
+      font-size:.825rem; color:var(--muted);
+    }
+    .site-footer a{ color:var(--muted); text-decoration:underline; text-underline-offset:2px; }
+    .site-footer a:hover{ color:var(--md-primary); }
   </style>
 
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
@@ -186,5 +208,12 @@
   <div class="toast-wrap" aria-live="polite"></div>
 
   {% block scripts %}{% endblock %}
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <span>&copy; 2026 ArchAiTect Workbench</span>
+      <span>Made by <a href="https://github.com/n1mz" target="_blank" rel="noopener">Nima Shafie</a></span>
+    </div>
+  </footer>
 </body>
 </html>
