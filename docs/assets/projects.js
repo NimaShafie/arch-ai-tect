@@ -14,19 +14,33 @@
   // You can edit these slugs/names/summaries as your real projects evolve.
   const STATIC_PROJECTS = [
     {
-      slug: "disney-ai-v3",
-      name: "Disney+ AI Clone",
-      summary:
-        "End-to-end architecture for a Disney+ style streaming platform with AI-assisted workflows.",
-      tagline: "Reference architecture",
-      github_url: "https://github.com/SevDev21/disney-ai-plus",
+      slug: "dev-kit",
+      name: "Dev Kit",
+      summary: "A C++ package management system hosted as a Python localhost server, supporting installation of pre-packaged tools, libraries, and plug-ins.",
+      tagline: "Architecture workspace",
+      created_at: "2026-04-12",
     },
     {
-      slug: "test-2",
-      name: "Test Project 2",
-      summary:
-        "Sandbox workspace used to experiment with the ArchAiTect Workbench features.",
-      tagline: "Sandbox",
+      slug: "hover-and-click",
+      name: "Hover And Click",
+      summary: "Architecture workspace managed by the ArchAiTect Workbench.",
+      tagline: "Architecture workspace",
+      created_at: "2025-12-02",
+    },
+    {
+      slug: "v4-test",
+      name: "V4 Test",
+      summary: "Architecture workspace managed by the ArchAiTect Workbench.",
+      tagline: "Architecture workspace",
+      created_at: "2025-12-02",
+    },
+    {
+      slug: "disney-ai-v3",
+      name: "Disney+ AI Clone",
+      summary: "End-to-end architecture for a Disney+ style streaming platform with AI-assisted workflows.",
+      tagline: "Reference architecture",
+      created_at: "2025-11-23",
+      github_url: "https://github.com/SevDev21/disney-ai-plus",
     },
   ];
 
@@ -215,15 +229,22 @@
       console.warn("projects.js: live fetch failed, using static fallback", e);
     }
 
-    // If the API call failed or returned nothing, fall back to static list.
+    // If the API call failed:
+    // - For #wb-projects: leave the static markdown content in place (already shows all projects).
+    // - For #wb-latest-projects: fall back to the static list.
     if (!items || !items.length) {
-      items = STATIC_PROJECTS.slice();
+      if (projectsHost) {
+        // Static markdown inside the div already has the correct list — don't overwrite it.
+        projectsHost = null;
+      }
+      if (latestHost) {
+        items = STATIC_PROJECTS.slice();
+      } else {
+        return;
+      }
     }
 
     if (!items || !items.length) {
-      // Only show the red error if we genuinely have no data at all.
-      if (projectsHost)
-        showErrorFor("wb-projects", "Could not load projects from Workbench.");
       if (latestHost)
         showErrorFor(
           "wb-latest-projects",

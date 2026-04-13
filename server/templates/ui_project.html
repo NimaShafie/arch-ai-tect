@@ -100,8 +100,9 @@
   </section>
   <!-- Two-column layout: left = brief, right = generate + view -->
   <div style="display:flex; gap:24px; align-items:stretch;">
-    <!-- LEFT: REQUIREMENTS BRIEF -->
-    <section class="card" style="flex:1.35;">
+    <!-- LEFT COLUMN: REQUIREMENTS BRIEF + GENERATE ARCHITECTURE -->
+    <div style="flex:1.35; display:flex; flex-direction:column; gap:24px;">
+    <section class="card">
       <div style="padding:24px 28px; height:100%; box-sizing:border-box;">
         <h2 class="h1" style="margin-bottom:10px;">1. Requirements Brief</h2>
         <p class="muted" style="margin-bottom:16px;">
@@ -147,117 +148,113 @@
         <div id="saveStatus" class="status-block"></div>
       </div>
     </section>
-    <!-- RIGHT COLUMN: GENERATE + VIEW OUTPUT -->
-    <div style="flex:1; display:flex; flex-direction:column; gap:24px; height:100%;">
-      <!-- Generate Architecture (tile style like previous Diagram Choices) -->
-      <section class="card" id="choices" style="flex:1;">
-        <div class="bd" style="padding:24px 28px; height:100%; box-sizing:border-box; display:flex; flex-direction:column;">
-          <h2 class="h1" style="margin-bottom:10px;">2. Generate Architecture</h2>
-          <p class="muted" style="margin-bottom:16px;">
-            Select which architectural diagrams to generate based on the Requirements Brief.
-          </p>
-          <style>
-            #choices .fields {
-              display: grid;
-              grid-template-columns: repeat(2, minmax(200px, 1fr));
-              grid-template-rows: repeat(3, 1fr);
-              gap: 16px 22px;
-              flex: 1;
-              align-content: stretch;
-              width: 100%;
-            }
-            #choices .tile {
-              position: relative;
-              height: 100%;
-              min-height: 96px;
-              border: 1px solid var(--outline, rgba(0,0,0,.08));
-              background: var(--surface-1, #f7f8fb);
-              border-radius: 12px;
-              transition:
-                transform .08s ease,
-                box-shadow .15s ease,
-                border-color .15s ease,
-                background .15s ease;
-              overflow: visible;
-              z-index: 1;
-            }
-            #choices .tile:hover {
-              transform: translateY(-1px);
-              border-color: color-mix(in srgb, var(--primary, #2962ff) 22%, transparent);
-              box-shadow: 0 6px 22px rgba(0,0,0,.07);
-            }
-            #choices .tile-hit {
-              position: absolute;
-              inset: 0;
-              display: flex;
-              align-items: center;
-              gap: 10px;
-              padding: 14px 16px;
-              padding-right: 16px;
-              cursor: pointer;
-              border-radius: 12px;
-            }
-            #choices .tile input[type="checkbox"] {
-              transform: translateY(1px);
-            }
-            #choices .label-text {
-              white-space: nowrap;
-              overflow: hidden;
-              text-overflow: ellipsis;
-            }
-          </style>
-          <form id="diagramForm" style="display:flex; flex-direction:column; flex:1;">
-            <div class="fields">
-              <div class="tile">
-                <label class="tile-hit">
-                  <input type="checkbox" name="choices" value="c4_context" />
-                  <span class="label-text">C4 Context</span>
-                </label>
-              </div>
-              <div class="tile">
-                <label class="tile-hit">
-                  <input type="checkbox" name="choices" value="c4_container" />
-                  <span class="label-text">C4 Container</span>
-                </label>
-              </div>
-              <div class="tile">
-                <label class="tile-hit">
-                  <input type="checkbox" name="choices" value="c4_component" />
-                  <span class="label-text">C4 Component</span>
-                </label>
-              </div>
-              <div class="tile">
-                <label class="tile-hit">
-                  <input type="checkbox" name="choices" value="sequence" />
-                  <span class="label-text">Sequence</span>
-                </label>
-              </div>
-              <div class="tile">
-                <label class="tile-hit">
-                  <input type="checkbox" name="choices" value="deployment" />
-                  <span class="label-text">Deployment</span>
-                </label>
-              </div>
-              <div class="tile">
-                <label class="tile-hit">
-                  <input type="checkbox" name="choices" value="logical" />
-                  <span class="label-text">Logical</span>
-                </label>
-              </div>
+    <!-- 2. Generate Architecture -->
+    <section class="card" id="choices">
+      <div class="bd" style="padding:24px 28px; box-sizing:border-box; display:flex; flex-direction:column;">
+        <h2 class="h1" style="margin-bottom:10px;">2. Generate Architecture</h2>
+        <p class="muted" style="margin-bottom:16px;">
+          Select which architectural diagrams to generate based on the Requirements Brief.
+        </p>
+        <style>
+          #choices .fields {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(140px, 1fr));
+            gap: 12px 18px;
+          }
+          #choices .tile {
+            position: relative;
+            min-height: 72px;
+            border: 1px solid var(--outline, rgba(0,0,0,.08));
+            background: var(--surface-1, #f7f8fb);
+            border-radius: 12px;
+            transition:
+              transform .08s ease,
+              box-shadow .15s ease,
+              border-color .15s ease,
+              background .15s ease;
+            overflow: visible;
+            z-index: 1;
+          }
+          #choices .tile:hover {
+            transform: translateY(-1px);
+            border-color: color-mix(in srgb, var(--primary, #2962ff) 22%, transparent);
+            box-shadow: 0 6px 22px rgba(0,0,0,.07);
+          }
+          #choices .tile-hit {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 16px;
+            cursor: pointer;
+            border-radius: 12px;
+          }
+          #choices .tile input[type="checkbox"] {
+            transform: translateY(1px);
+          }
+          #choices .label-text {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+        </style>
+        <form id="diagramForm" style="display:flex; flex-direction:column; flex:1;">
+          <div class="fields">
+            <div class="tile">
+              <label class="tile-hit">
+                <input type="checkbox" name="choices" value="c4_context" />
+                <span class="label-text">C4 Context</span>
+              </label>
             </div>
-            <div style="margin-top:12px;">
-              <button
-                class="btn primary"
-                id="generateBtn"
-                style="display:inline-flex; align-items:center; justify-content:center; padding:10px 18px;"
-              >
-                Generate Diagrams
-              </button>
+            <div class="tile">
+              <label class="tile-hit">
+                <input type="checkbox" name="choices" value="c4_container" />
+                <span class="label-text">C4 Container</span>
+              </label>
             </div>
-            <div id="genStatus" class="status-block"></div>
-          </form>
-        </div>
-      </section>
+            <div class="tile">
+              <label class="tile-hit">
+                <input type="checkbox" name="choices" value="c4_component" />
+                <span class="label-text">C4 Component</span>
+              </label>
+            </div>
+            <div class="tile">
+              <label class="tile-hit">
+                <input type="checkbox" name="choices" value="sequence" />
+                <span class="label-text">Sequence</span>
+              </label>
+            </div>
+            <div class="tile">
+              <label class="tile-hit">
+                <input type="checkbox" name="choices" value="deployment" />
+                <span class="label-text">Deployment</span>
+              </label>
+            </div>
+            <div class="tile">
+              <label class="tile-hit">
+                <input type="checkbox" name="choices" value="logical" />
+                <span class="label-text">Logical</span>
+              </label>
+            </div>
+          </div>
+          <div style="margin-top:12px;">
+            <button
+              class="btn primary"
+              id="generateBtn"
+              style="display:inline-flex; align-items:center; justify-content:center; padding:10px 18px;"
+            >
+              Generate Diagrams
+            </button>
+          </div>
+          <div id="genStatus" class="status-block"></div>
+        </form>
+      </div>
+    </section>
+    </div><!-- end left column -->
+    <!-- RIGHT COLUMN: VIEW OUTPUT + PUSH TO REPOSITORY -->
+    <div style="flex:1; display:flex; flex-direction:column; gap:24px;">
+
       <!-- View Output (directly under Generate Architecture) -->
       <section class="card">
         <div style="padding:24px 28px;">
