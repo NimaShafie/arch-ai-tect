@@ -99,11 +99,11 @@
     </div>
   </section>
   <!-- Two-column layout: left = brief only, right = generate + view + push -->
-  <div style="display:flex; gap:24px; align-items:stretch;">
+  <div style="display:flex; gap:24px; align-items:flex-start;">
     <!-- LEFT COLUMN: REQUIREMENTS BRIEF -->
     <div style="flex:1.3; display:flex; flex-direction:column;">
-    <section class="card" style="flex:1; display:flex; flex-direction:column;">
-      <div style="padding:24px 28px; box-sizing:border-box; display:flex; flex-direction:column; flex:1;">
+    <section class="card">
+      <div style="padding:24px 28px; box-sizing:border-box;">
         <h2 class="h1" style="margin-bottom:10px;">1. Requirements Brief</h2>
         <p class="muted" style="margin-bottom:16px;">
           Describe your system, key users, major flows, constraints, expectations, and tech preferences.
@@ -116,7 +116,7 @@
           id="briefPrompt"
           class="input"
           placeholder="For example: a streaming platform where users can sign in, manage profiles, browse a catalog, and start video playback..."
-          style="flex:1.2; min-height:140px; padding:10px 12px; resize:vertical;"
+          style="min-height:160px; padding:10px 12px; resize:vertical;"
         ></textarea>
         <div style="margin-top:14px;">
           <button
@@ -134,7 +134,7 @@
         <textarea
           id="briefJson"
           class="input"
-          style="flex:1; min-height:160px; font-family:monospace; padding:10px 12px; resize:vertical;"
+          style="min-height:220px; font-family:monospace; padding:10px 12px; resize:vertical;"
         ></textarea>
         <div style="margin-top:14px;">
           <button
