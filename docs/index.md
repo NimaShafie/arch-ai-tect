@@ -26,20 +26,20 @@ and consume them here in a clean, versioned documentation hub — backed by GitH
 
 ## At a glance
 
-<div class="stats-grid">
+<div id="wb-stats-grid" class="stats-grid">
 
 <div class="stat-card">
-  <div class="stat-value">2</div>
+  <div class="stat-value" id="wb-stat-projects">—</div>
   <div class="stat-label">Active projects</div>
 </div>
 
 <div class="stat-card">
-  <div class="stat-value">10+</div>
+  <div class="stat-value" id="wb-stat-diagrams">—</div>
   <div class="stat-label">Generated diagrams</div>
 </div>
 
 <div class="stat-card">
-  <div class="stat-value">8</div>
+  <div class="stat-value" id="wb-stat-docs">—</div>
   <div class="stat-label">Core architecture docs</div>
 </div>
 

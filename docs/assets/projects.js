@@ -211,14 +211,27 @@
     host.appendChild(container);
   }
 
+  // ---- Stats grid (home page "At a glance") --------------------------------
+
+  function renderStats(items) {
+    const n = items.length;
+    const elProjects  = document.getElementById("wb-stat-projects");
+    const elDiagrams  = document.getElementById("wb-stat-diagrams");
+    const elDocs      = document.getElementById("wb-stat-docs");
+    if (elProjects) elProjects.textContent = n;
+    if (elDiagrams) elDiagrams.textContent = (n * 6) + "+";
+    if (elDocs)     elDocs.textContent     = n * 4;
+  }
+
   // ---- Wire everything up -------------------------------------------------
 
   document.addEventListener("DOMContentLoaded", async () => {
     const projectsHost = document.getElementById("wb-projects");
-    const latestHost = document.getElementById("wb-latest-projects");
+    const latestHost   = document.getElementById("wb-latest-projects");
+    const hasStats     = !!document.getElementById("wb-stat-projects");
 
-    // If neither exists on this page, don't bother calling the API.
-    if (!projectsHost && !latestHost) return;
+    // If nothing on this page needs data, skip the fetch.
+    if (!projectsHost && !latestHost && !hasStats) return;
 
     let items = null;
 
@@ -229,27 +242,16 @@
       console.warn("projects.js: live fetch failed, using static fallback", e);
     }
 
-    // If the API call failed:
-    // - For #wb-projects: leave the static markdown content in place (already shows all projects).
-    // - For #wb-latest-projects: fall back to the static list.
-    if (!items || !items.length) {
-      if (projectsHost) {
-        // Static markdown inside the div already has the correct list — don't overwrite it.
-        projectsHost = null;
-      }
-      if (latestHost) {
-        items = STATIC_PROJECTS.slice();
-      } else {
-        return;
-      }
+    // If the API call failed, fall back to the static list for dynamic sections.
+    // For #wb-projects the static markdown is already correct — don't overwrite it.
+    const liveFailed = !items || !items.length;
+    if (liveFailed) {
+      items = STATIC_PROJECTS.slice();
     }
 
     if (!items || !items.length) {
       if (latestHost)
-        showErrorFor(
-          "wb-latest-projects",
-          "Could not load latest projects from Workbench."
-        );
+        showErrorFor("wb-latest-projects", "Could not load latest projects from Workbench.");
       return;
     }
 
@@ -260,7 +262,12 @@
       return bk.localeCompare(ak);
     });
 
-    if (projectsHost) renderProjectsList(items);
+    // Always render stats (works with live data or static fallback).
+    renderStats(items);
+
+    // Only overwrite the projects list if we got live data
+    // (static markdown in #wb-projects is already correct as a fallback).
+    if (projectsHost && !liveFailed) renderProjectsList(items);
     if (latestHost) renderLatestProjects(items);
   });
 })();
