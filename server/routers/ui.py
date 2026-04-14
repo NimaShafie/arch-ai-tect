@@ -6,7 +6,7 @@ import subprocess
 import sys
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from slugify import slugify
 from sqlmodel import select
@@ -100,6 +100,16 @@ def ui_home(request: Request, session=Depends(get_session)):
     )
 
 
+@router.post("/", include_in_schema=False)
+def ui_home_post():
+    """
+    POST /  -> redirect to GET /
+    Cloudflare's browser integrity check POSTs back to the origin after
+    passing its JS challenge; redirect to the normal dashboard.
+    """
+    return RedirectResponse(url="/", status_code=303)
+
+
 @router.get("/ui/{slug}", response_class=HTMLResponse, include_in_schema=False)
 def ui_project(slug: str, request: Request, session=Depends(get_session)):
     """
@@ -147,16 +157,28 @@ def api_list_projects(session=Depends(get_session)):
         select(Project).order_by(Project.created_at.desc())
     ).all()
 
-    return [
-        {
+    import json as _json
+    from server.core.projects import PROJECTS_DIR
+
+    results = []
+    for p in projects:
+        summary = None
+        try:
+            brief_path = PROJECTS_DIR / p.slug / "brief.json"
+            if brief_path.exists():
+                brief = _json.loads(brief_path.read_text("utf-8"))
+                summary = brief.get("summary")
+        except Exception:
+            pass
+        results.append({
             "id": p.id,
             "name": p.name,
             "slug": p.slug,
             "nav_title": getattr(p, "nav_title", p.name),
             "created_at": getattr(p, "created_at", None),
-        }
-        for p in projects
-    ]
+            "summary": summary,
+        })
+    return results
 
 
 @router.post("/api/projects")

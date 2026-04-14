@@ -1,17 +1,17 @@
 // docs/assets/projects.js
 // Dynamic project listings for the MkDocs site:
-// - On /projects/ index: fills #wb-projects with a simple list.
+// - On /projects/ index: fills #wb-projects with project cards.
 // - On the home page: fills #wb-latest-projects with nice "card" layout.
 //
 // Uses the Workbench API: GET /api/projects
-// Falls back to a static list if the API can't be reached (e.g., CORS/403).
+// Falls back to a static list if the API can't be reached.
 
 (function () {
   const cfg = window.__WB_CFG || {};
   const DEFAULT_API = "https://workbench.shafie.org";
+  const WB_BASE = DEFAULT_API;
 
   // Static fallback projects (used if the API call fails).
-  // You can edit these slugs/names/summaries as your real projects evolve.
   const STATIC_PROJECTS = [
     {
       slug: "dev-kit",
@@ -44,7 +44,6 @@
     },
   ];
 
-  // Always default to the Workbench API, unless explicitly overridden.
   const API_BASE =
     cfg.API_BASE ||
     window.__WB_API_BASE ||
@@ -58,8 +57,6 @@
       encodeURIComponent(bust);
 
     const resp = await fetch(url, {
-      // Do NOT send cookies/credentials cross-origin. This avoids the
-      // browser enforcing Access-Control-Allow-Credentials: true.
       credentials: "omit",
       cache: "no-store",
       mode: "cors",
@@ -69,28 +66,28 @@
     return await resp.json();
   }
 
-  function showErrorFor(hostId, msg) {
-    const host = document.getElementById(hostId);
-    if (!host) return;
-    host.innerHTML =
-      '<p style="color:#b00020">' +
-      (msg || "Could not load projects from Workbench.") +
-      "</p>";
+  // ---- Icon picker --------------------------------------------------------
+
+  function pickIconForSlug(slug) {
+    const s = (slug || "").toLowerCase();
+    if (s.includes("disney")) return "🎬";
+    if (s.includes("test")) return "🧪";
+    if (s.includes("auth")) return "🔐";
+    if (s.includes("hover") || s.includes("click")) return "🖱️";
+    if (s.includes("dev") || s.includes("kit")) return "🛠️";
+    return "🧩";
   }
 
-  // ---- Projects index: simple list ----------------------------------------
+  // ---- Projects index: chip row -------------------------------------------
 
   function renderProjectsList(items) {
     const host = document.getElementById("wb-projects");
     if (!host) return;
 
-    const ul = document.createElement("ul");
-    ul.style.listStyle = "disc";
-    ul.style.paddingLeft = "1.25rem";
+    const row = document.createElement("div");
+    row.className = "wb-project-chips";
 
     for (const p of items) {
-      const li = document.createElement("li");
-      const a = document.createElement("a");
       const name =
         p.name ||
         p.title ||
@@ -98,34 +95,28 @@
         p.project_name ||
         p.slug ||
         "Unnamed project";
-      a.textContent = name;
+
+      const a = document.createElement("a");
+      a.className = "wb-chip";
       a.href = "/projects/" + encodeURIComponent(p.slug) + "/";
-      li.appendChild(a);
-      ul.appendChild(li);
+      a.innerHTML =
+        '<span class="wb-chip-icon">' + pickIconForSlug(p.slug) + "</span>" +
+        '<span class="wb-chip-label">' + name + "</span>";
+      row.appendChild(a);
     }
 
     host.innerHTML = "";
-    host.appendChild(ul);
+    host.appendChild(row);
   }
 
   // ---- Home page: "Latest projects" cards ---------------------------------
-
-  function pickIconForSlug(slug) {
-    const s = (slug || "").toLowerCase();
-    if (s.includes("disney")) return "🎬";
-    if (s.includes("test")) return "🧪";
-    if (s.includes("auth")) return "🔐";
-    return "🧩";
-  }
 
   function renderLatestProjects(items) {
     const host = document.getElementById("wb-latest-projects");
     if (!host) return;
 
-    // How many cards to show on the home page
     const maxAttr = host.getAttribute("data-max");
     const max = maxAttr ? parseInt(maxAttr, 10) || 2 : 2;
-
     const latest = items.slice(0, max);
 
     if (!latest.length) {
@@ -138,18 +129,8 @@
 
     latest.forEach((p) => {
       const slug = p.slug;
-      const name =
-        p.name ||
-        p.title ||
-        p.nav_title ||
-        p.project_name ||
-        slug ||
-        "Unnamed project";
-      const summary =
-        p.summary ||
-        p.description ||
-        "Architecture workspace managed by the ArchAiTect Workbench.";
-
+      const name = p.name || p.title || p.nav_title || p.project_name || slug || "Unnamed project";
+      const summary = p.summary || p.description || "Architecture workspace managed by the ArchAiTect Workbench.";
       const icon = pickIconForSlug(slug);
 
       const card = document.createElement("div");
@@ -168,8 +149,7 @@
 
       const metaDiv = document.createElement("div");
       metaDiv.className = "project-meta";
-      metaDiv.textContent =
-        (p.tagline || "Architecture workspace").toUpperCase();
+      metaDiv.textContent = (p.tagline || "Architecture workspace").toUpperCase();
 
       const textP = document.createElement("p");
       textP.className = "project-text";
@@ -182,17 +162,23 @@
       docsBtn.className = "md-button md-button--primary";
       docsBtn.href = "./projects/" + encodeURIComponent(slug) + "/";
       docsBtn.textContent = "Open project docs";
-
       linksDiv.appendChild(docsBtn);
 
-      // Optional GitHub link if API provides it
+      const wbBtn = document.createElement("a");
+      wbBtn.className = "md-button";
+      wbBtn.href = WB_BASE + "/ui/" + encodeURIComponent(slug);
+      wbBtn.target = "_blank";
+      wbBtn.rel = "noopener";
+      wbBtn.textContent = "Open in Workbench ↗";
+      linksDiv.appendChild(wbBtn);
+
       if (p.github_url) {
         const ghBtn = document.createElement("a");
-        ghBtn.className = "md-button md-button--secondary";
+        ghBtn.className = "md-button";
         ghBtn.href = p.github_url;
         ghBtn.target = "_blank";
         ghBtn.rel = "noopener";
-        ghBtn.textContent = "GitHub repo";
+        ghBtn.textContent = "GitHub ↗";
         linksDiv.appendChild(ghBtn);
       }
 
@@ -203,7 +189,6 @@
 
       card.appendChild(iconDiv);
       card.appendChild(bodyDiv);
-
       container.appendChild(card);
     });
 
@@ -211,63 +196,42 @@
     host.appendChild(container);
   }
 
-  // ---- Stats grid (home page "At a glance") --------------------------------
-
-  function renderStats(items) {
-    const n = items.length;
-    const elProjects  = document.getElementById("wb-stat-projects");
-    const elDiagrams  = document.getElementById("wb-stat-diagrams");
-    const elDocs      = document.getElementById("wb-stat-docs");
-    if (elProjects) elProjects.textContent = n;
-    if (elDiagrams) elDiagrams.textContent = (n * 6) + "+";
-    if (elDocs)     elDocs.textContent     = n * 4;
-  }
-
   // ---- Wire everything up -------------------------------------------------
 
   document.addEventListener("DOMContentLoaded", async () => {
     const projectsHost = document.getElementById("wb-projects");
-    const latestHost   = document.getElementById("wb-latest-projects");
-    const hasStats     = !!document.getElementById("wb-stat-projects");
+    const latestHost = document.getElementById("wb-latest-projects");
+    const statCount = document.getElementById("wb-stat-project-count");
 
-    // If nothing on this page needs data, skip the fetch.
-    if (!projectsHost && !latestHost && !hasStats) return;
+    if (!projectsHost && !latestHost && !statCount) return;
 
     let items = null;
 
     try {
-      // Try live data first (will fail if Cloudflare blocks CORS).
       items = await fetchProjects();
     } catch (e) {
       console.warn("projects.js: live fetch failed, using static fallback", e);
     }
 
-    // If the API call failed, fall back to the static list for dynamic sections.
-    // For #wb-projects the static markdown is already correct — don't overwrite it.
-    const liveFailed = !items || !items.length;
-    if (liveFailed) {
+    // Always fall back to static list if API failed or returned nothing.
+    if (!items || !items.length) {
       items = STATIC_PROJECTS.slice();
     }
 
-    if (!items || !items.length) {
-      if (latestHost)
-        showErrorFor("wb-latest-projects", "Could not load latest projects from Workbench.");
-      return;
-    }
+    if (!items.length) return;
 
-    // Sort newest first if created_at exists, otherwise by slug.
+    // Sort newest first.
     items.sort((a, b) => {
       const ak = (a.created_at || "") + (a.slug || "");
       const bk = (b.created_at || "") + (b.slug || "");
       return bk.localeCompare(ak);
     });
 
-    // Always render stats (works with live data or static fallback).
-    renderStats(items);
+    if (statCount) {
+      statCount.textContent = items.length;
+    }
 
-    // Only overwrite the projects list if we got live data
-    // (static markdown in #wb-projects is already correct as a fallback).
-    if (projectsHost && !liveFailed) renderProjectsList(items);
+    if (projectsHost) renderProjectsList(items);
     if (latestHost) renderLatestProjects(items);
   });
 })();

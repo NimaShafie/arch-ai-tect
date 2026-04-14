@@ -36,7 +36,7 @@ def _render_projects_index(projects: List[Project]) -> str:
             "_No projects have been created yet via the Workbench UI._\n"
         )
 
-    # Jump list
+    # Jump list — replaced at runtime by projects.js with rendered <a> elements.
     jump_list = "\n".join(
         f"- [{p.name}](/projects/{p.slug}/)"
         for p in projects
